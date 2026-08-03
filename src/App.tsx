@@ -12,7 +12,9 @@ import SubscriptionsPage from "./pages/SubscriptionsPage";
 import InsightsPage from "./pages/InsightsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
+import { Analytics } from "@vercel/analytics/react";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,6 +59,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <Analytics />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

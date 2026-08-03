@@ -814,3 +814,58 @@ body::before {
   .sz-process-steps { grid-template-columns: 1fr; }
   .sz-features-grid { grid-template-columns: 1fr; }
 }
+
+/* ── SPIN ANIMATION (loading states) ── */
+@keyframes sz-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── STICKY MOBILE CTA ── */
+.sz-sticky-mobile-cta {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+  padding: 12px 20px 20px;
+  background: linear-gradient(to top, rgba(245,244,241,0.98) 60%, transparent);
+  backdrop-filter: blur(8px);
+}
+@media (max-width: 900px) {
+  .sz-sticky-mobile-cta { display: block; }
+}
+
+/* ── MOBILE HERO STAT FALLBACK ── */
+.sz-mobile-hero-stat {
+  display: none;
+  padding: 0 20px 40px;
+}
+@media (max-width: 900px) {
+  .sz-mobile-hero-stat { display: block; }
+}
+
+/* ── TESTIMONIALS GRID ── */
+.sz-testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .sz-testimonials-grid { grid-template-columns: 1fr; }
+}
+
+/* ── SKELETON SHIMMER ── */
+@keyframes sz-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.sz-skeleton {
+  background: linear-gradient(90deg, var(--sz-gray-100) 25%, var(--sz-gray-200) 50%, var(--sz-gray-100) 75%);
+  background-size: 400px 100%;
+  animation: sz-shimmer 1.4s ease infinite;
+  border-radius: 8px;
+}
+
+/* ── MOBILE BODY PADDING (prevent content hiding behind sticky CTA) ── */
+@media (max-width: 900px) {
+  .sz-final-cta-section { padding-bottom: 100px; }
+}
+

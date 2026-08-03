@@ -1,9 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+const TESTIMONIALS = [
+  {
+    name: 'Arjun Sharma',
+    role: 'Software Engineer, Bengaluru',
+    avatar: 'AS',
+    quote: "Found ₹2,400/mo in forgotten subscriptions within my first week. The AI caught Netflix, Hotstar AND an old Adobe plan I completely forgot about.",
+    saved: '₹2,400/mo',
+  },
+  {
+    name: 'Priya Mehta',
+    role: 'Product Manager, Mumbai',
+    avatar: 'PM',
+    quote: "The renewal calendar alone is worth it. I used to get surprised by annual charges constantly. Not anymore — SubZero warns me 7 days in advance.",
+    saved: '₹1,800/mo',
+  },
+  {
+    name: 'Rahul Nair',
+    role: 'Freelance Designer, Delhi',
+    avatar: 'RN',
+    quote: "Clean, fast, and actually useful. Spotted that I had both Figma and Adobe CC overlapping — dropped Adobe and saved ₹1,675/mo instantly.",
+    saved: '₹1,675/mo',
+  },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
@@ -16,6 +41,12 @@ export default function LandingPage() {
     );
     document.querySelectorAll('.sz-reveal').forEach(el => observerRef.current?.observe(el));
     return () => observerRef.current?.disconnect();
+  }, []);
+
+  // Auto-cycle testimonials
+  useEffect(() => {
+    const t = setInterval(() => setActiveTestimonial(a => (a + 1) % TESTIMONIALS.length), 4000);
+    return () => clearInterval(t);
   }, []);
 
   return (
@@ -43,7 +74,8 @@ export default function LandingPage() {
         <ul className="sz-nav-links">
           <li><a href="#features">Features</a></li>
           <li><a href="#how-it-works">How it works</a></li>
-          <li><a href="#insights">Insights</a></li>
+          <li><a href="#testimonials">Reviews</a></li>
+          <li><a href="#pricing">Pricing</a></li>
         </ul>
         <button className="sz-nav-cta" onClick={() => navigate('/auth')}>Get Started Free</button>
       </nav>
@@ -63,6 +95,14 @@ export default function LandingPage() {
               <button className="sz-btn-primary" onClick={() => navigate('/auth')}>Start for Free →</button>
               <button className="sz-btn-secondary" onClick={() => navigate('/auth')}>See Demo ↗</button>
             </div>
+            <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              {[{ val: '12k+', label: 'Active users' }, { val: '₹2.4Cr', label: 'Saved' }, { val: '4.9★', label: 'Rating' }].map((s, i) => (
+                <div key={i}>
+                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, color: '#0A0A0A' }}>{s.val}</div>
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="sz-hero-preview sz-fade-in sz-fade-in-4">
@@ -73,13 +113,13 @@ export default function LandingPage() {
             <div className="sz-preview-card">
               <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0EFEC', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#8A8A82', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Monthly Overview</span>
-                <span style={{ fontSize: 12, color: '#8A8A82' }}>Apr 2025</span>
+                <span style={{ fontSize: 12, color: '#8A8A82' }}>Aug 2026</span>
               </div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, fontWeight: 900, color: '#0A0A0A', padding: '20px 24px 8px' }}>₹8,490</div>
               <div style={{ fontSize: 13, color: '#8A8A82', padding: '0 24px 16px' }}>Total subscription spend</div>
               <div style={{ padding: '16px 24px', display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
                 {[35, 55, 42, 68, 52, 75, 60].map((h, i) => (
-                  <div key={i} style={{ flex: 1, height: h, background: i === 6 ? '#0A0A0A' : '#E2E1DC', borderRadius: '4px 4px 0 0' }} />
+                  <div key={i} style={{ flex: 1, height: h, background: i === 6 ? '#E8541A' : '#E2E1DC', borderRadius: '4px 4px 0 0' }} />
                 ))}
               </div>
               <div style={{ padding: '16px 24px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -102,6 +142,23 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="sz-float-card sz-float-card-2">💰 Save ₹1,890/mo</div>
+          </div>
+        </div>
+
+        {/* Mobile hero fallback — shown on small screens instead of preview card */}
+        <div className="sz-mobile-hero-stat sz-fade-in sz-fade-in-4">
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            {[
+              { emoji: '💸', label: 'Avg wasted/mo', val: '₹3,200' },
+              { emoji: '📱', label: 'Avg subscriptions', val: '11' },
+              { emoji: '🤖', label: 'AI insights', val: 'Free' },
+            ].map((s, i) => (
+              <div key={i} style={{ background: 'white', borderRadius: 16, padding: '16px 20px', textAlign: 'center', boxShadow: 'var(--sz-card-shadow)', minWidth: 100 }}>
+                <div style={{ fontSize: 24, marginBottom: 4 }}>{s.emoji}</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 900 }}>{s.val}</div>
+                <div style={{ fontSize: 11, color: 'var(--sz-gray-500)', marginTop: 2 }}>{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -253,6 +310,96 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* TESTIMONIALS */}
+        <div className="sz-section sz-reveal" id="testimonials">
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <span className="sz-section-label">What Users Say</span>
+            <h2 className="sz-section-title">Real people, real savings</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }} className="sz-testimonials-grid">
+            {TESTIMONIALS.map((t, i) => (
+              <div
+                key={i}
+                className="sz-card"
+                style={{
+                  padding: 28,
+                  transition: 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1)',
+                  transform: i === activeTestimonial ? 'translateY(-8px)' : 'none',
+                  boxShadow: i === activeTestimonial ? 'var(--sz-card-shadow-hover)' : 'var(--sz-card-shadow)',
+                  borderTop: i === activeTestimonial ? '3px solid var(--sz-accent)' : '3px solid transparent',
+                }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 16, color: 'var(--sz-accent)', fontFamily: 'serif', lineHeight: 1 }}>"</div>
+                <p style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--sz-gray-700)', marginBottom: 20 }}>{t.quote}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--sz-gray-100)' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0A0A0A', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
+                    {t.avatar}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{t.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>{t.role}</div>
+                  </div>
+                  <div style={{ background: 'var(--sz-accent-light)', color: 'var(--sz-accent)', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100 }}>
+                    Saved {t.saved}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Dots indicator */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
+            {TESTIMONIALS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveTestimonial(i)}
+                style={{
+                  width: i === activeTestimonial ? 24 : 8, height: 8, borderRadius: 100,
+                  background: i === activeTestimonial ? 'var(--sz-accent)' : 'var(--sz-gray-300)',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.3s', padding: 0
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* PRICING */}
+        <div className="sz-section sz-reveal" id="pricing">
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <span className="sz-section-label">Simple Pricing</span>
+            <h2 className="sz-section-title">Free, <em style={{ color: 'var(--sz-accent)', fontStyle: 'italic' }}>forever</em></h2>
+            <p style={{ fontSize: 16, color: 'var(--sz-gray-500)', marginTop: 8 }}>No credit card. No subscriptions about subscriptions. Just free.</p>
+          </div>
+          <div style={{ maxWidth: 480, margin: '0 auto' }}>
+            <div className="sz-card" style={{ padding: 40, textAlign: 'center', border: '2px solid var(--sz-black)', position: 'relative', overflow: 'visible' }}>
+              <div style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', background: 'var(--sz-accent)', color: 'white', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 100, whiteSpace: 'nowrap' }}>
+                ✦ Most Popular
+              </div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 48, fontWeight: 900, color: '#0A0A0A', lineHeight: 1 }}>₹0</div>
+              <div style={{ fontSize: 15, color: 'var(--sz-gray-500)', marginTop: 4, marginBottom: 32 }}>per month, forever</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32, textAlign: 'left' }}>
+                {[
+                  'Unlimited subscriptions',
+                  'AI-powered insights & recommendations',
+                  'Renewal alerts & calendar',
+                  'Spend analytics & charts',
+                  'CSV data export',
+                  'Multi-device sync via Supabase',
+                  'Overlap & duplicate detection',
+                ].map((f, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                    <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 16 }}>✓</span>
+                    <span style={{ color: 'var(--sz-gray-700)' }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <button className="sz-btn-primary" style={{ width: '100%', padding: 16, fontSize: 16 }} onClick={() => navigate('/auth')}>
+                Get Started Free →
+              </button>
+              <div style={{ fontSize: 12, color: 'var(--sz-gray-300)', marginTop: 16 }}>No credit card required · Takes 3 minutes</div>
+            </div>
+          </div>
+        </div>
+
         {/* FINAL CTA */}
         <div className="sz-final-cta-section sz-reveal">
           <div className="sz-final-cta-card">
@@ -278,8 +425,24 @@ export default function LandingPage() {
         </div>
 
         {/* Footer */}
-        <div style={{ textAlign: 'center', padding: '32px 48px', borderTop: '1px solid var(--sz-gray-200)', color: 'var(--sz-gray-500)', fontSize: 13 }}>
-          © 2025 SubZero · Subscription Intelligence · Built with ❤️
+        <div style={{ borderTop: '1px solid var(--sz-gray-200)', padding: '32px 48px' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 900, color: '#0A0A0A' }}>SubZero</div>
+            <div style={{ display: 'flex', gap: 24, fontSize: 13, color: 'var(--sz-gray-500)' }}>
+              <a href="#features" style={{ textDecoration: 'none', color: 'var(--sz-gray-500)', transition: 'color 0.2s' }} onMouseEnter={e => { (e.currentTarget).style.color = '#0A0A0A'; }} onMouseLeave={e => { (e.currentTarget).style.color = 'var(--sz-gray-500)'; }}>Features</a>
+              <a href="#pricing" style={{ textDecoration: 'none', color: 'var(--sz-gray-500)', transition: 'color 0.2s' }} onMouseEnter={e => { (e.currentTarget).style.color = '#0A0A0A'; }} onMouseLeave={e => { (e.currentTarget).style.color = 'var(--sz-gray-500)'; }}>Pricing</a>
+              <a href="#how-it-works" style={{ textDecoration: 'none', color: 'var(--sz-gray-500)', transition: 'color 0.2s' }} onMouseEnter={e => { (e.currentTarget).style.color = '#0A0A0A'; }} onMouseLeave={e => { (e.currentTarget).style.color = 'var(--sz-gray-500)'; }}>How It Works</a>
+              <button onClick={() => navigate('/auth')} style={{ background: 'none', border: 'none', color: 'var(--sz-accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>Sign Up →</button>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--sz-gray-300)' }}>© 2026 SubZero · Built with ❤️ in India</div>
+          </div>
+        </div>
+
+        {/* Sticky mobile CTA */}
+        <div className="sz-sticky-mobile-cta">
+          <button className="sz-btn-primary" style={{ width: '100%', padding: 16, fontSize: 16, borderRadius: 16 }} onClick={() => navigate('/auth')}>
+            Get Started Free →
+          </button>
         </div>
       </div>
     </div>

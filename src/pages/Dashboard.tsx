@@ -5,32 +5,21 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { useInsights } from '@/hooks/useInsights';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { fmtCurrency, daysUntil, renewalUrgencyColor } from '@/lib/format';
 
 const CATEGORY_COLORS: Record<string, string> = {
-  Entertainment: '#0A0A0A', Productivity: '#4A4A44', Music: '#1DB954',
-  Design: '#F24E1E', Cloud: '#0078D4', Health: '#16a34a',
-  Education: '#7c3aed', News: '#8A8A82', Other: '#E8541A'
+  Entertainment: '#E8541A', Productivity: '#0078D4', Music: '#1DB954',
+  Design: '#F24E1E', Cloud: '#7c3aed', Health: '#16a34a',
+  Education: '#f59e0b', News: '#8A8A82', Other: '#4A4A44'
 };
-
-function fmtCurrency(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000) return `₹${n.toLocaleString('en-IN')}`;
-  return `₹${Math.round(n)}`;
-}
-
-function daysUntil(dateStr: string | null) {
-  if (!dateStr) return 999;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: subscriptions = [], getMonthly, totalMonthly, deleteSubscription } = useSubscriptions();
   const { data: insights = [], dismissInsight, totalSavings } = useInsights(subscriptions);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const name = (user?.user_metadata?.full_name as string) || user?.email || 'there';
   const firstName = name.split(' ')[0];
@@ -63,10 +52,13 @@ export default function Dashboard() {
 
   const handleMarkCancellation = async (id: string, name: string) => {
     try {
+      setDeletingId(id);
       await deleteSubscription.mutateAsync(id);
       toast.success(`${name} cancelled ✓`);
     } catch {
       toast.error('Could not update subscription');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -81,8 +73,15 @@ export default function Dashboard() {
             <div className="sz-page-heading sz-fade-in sz-fade-in-1">{greeting}, {firstName} ✦</div>
             <div className="sz-page-sub sz-fade-in sz-fade-in-2">Here's your subscription overview for {monthYear}</div>
           </div>
-          <div className="sz-avatar sz-fade-in sz-fade-in-1">
-            {firstName.slice(0, 2).toUpperCase()}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {subscriptions.length > 0 && (
+              <div style={{ fontSize: 13, color: 'var(--sz-gray-500)', background: 'var(--sz-gray-100)', padding: '6px 14px', borderRadius: 100 }}>
+                {subscriptions.length} active
+              </div>
+            )}
+            <div className="sz-avatar sz-fade-in sz-fade-in-1" onClick={() => navigate('/settings')}>
+              {firstName.slice(0, 2).toUpperCase()}
+            </div>
           </div>
         </div>
 
@@ -91,17 +90,23 @@ export default function Dashboard() {
           <div className="sz-stat-card sz-fade-in sz-fade-in-1">
             <div className="sz-stat-label">Monthly Spend</div>
             <div className="sz-stat-value">{fmtCurrency(totalMonthly)}</div>
-            <div className="sz-stat-change sz-change-up">{subscriptions.length} active subscriptions</div>
+            <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>
+              {subscriptions.length} active subscription{subscriptions.length !== 1 ? 's' : ''}
+            </div>
           </div>
           <div className="sz-stat-card sz-fade-in sz-fade-in-2">
             <div className="sz-stat-label">Yearly Projection</div>
             <div className="sz-stat-value">{fmtCurrency(totalMonthly * 12)}</div>
-            <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>{subscriptions.length} services tracked</div>
+            <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>
+              {fmtCurrency(totalMonthly * 12 / 12)}/mo average
+            </div>
           </div>
           <div className="sz-stat-card sz-fade-in sz-fade-in-3" style={{ background: 'var(--sz-black)' }}>
             <div className="sz-stat-label" style={{ color: 'rgba(255,255,255,0.4)' }}>Savings Potential</div>
             <div className="sz-stat-value" style={{ color: 'var(--sz-accent)' }}>{fmtCurrency(totalSavings / 12)}</div>
-            <div className="sz-stat-change" style={{ color: 'rgba(255,255,255,0.4)' }}>From {insights.length} AI insights</div>
+            <div className="sz-stat-change" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {insights.length} AI insight{insights.length !== 1 ? 's' : ''} waiting
+            </div>
           </div>
         </div>
 
@@ -125,17 +130,20 @@ export default function Dashboard() {
                       formatter={(v: number) => [`₹${v}`, 'Monthly']}
                       contentStyle={{ background: '#0A0A0A', border: 'none', borderRadius: 10, color: 'white', fontSize: 12 }}
                     />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]}
-                      fill="#0A0A0A"
-                      label={false}
-                    />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#0A0A0A'} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
               <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--sz-gray-500)' }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
-                <div>Add subscriptions to see breakdown</div>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>No spend data yet</div>
+                <div style={{ fontSize: 13, marginBottom: 20 }}>Add subscriptions to see category breakdown</div>
+                <button className="sz-btn-primary" style={{ fontSize: 13, padding: '10px 20px' }} onClick={() => navigate('/subscriptions')}>+ Add Subscription</button>
               </div>
             )}
           </div>
@@ -144,23 +152,31 @@ export default function Dashboard() {
           <div className="sz-card sz-fade-in sz-fade-in-3" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '24px 24px 0' }}>
               <div className="sz-card-title">Next Renewals</div>
-              <div className="sz-card-subtitle">Coming up soon</div>
+              <div className="sz-card-subtitle">Coming up in 30 days</div>
             </div>
             <div style={{ marginTop: 12 }}>
               {upcoming.length === 0 ? (
-                <div style={{ padding: '20px 24px', color: 'var(--sz-gray-500)', fontSize: 14 }}>No upcoming renewals in 30 days</div>
+                <div style={{ padding: '28px 24px', textAlign: 'center', color: 'var(--sz-gray-500)', fontSize: 14 }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+                  <div>No renewals in the next 30 days</div>
+                </div>
               ) : upcoming.map(r => {
                 const days = daysUntil(r.next_renewal_date);
-                const dot = days <= 3 ? '#dc2626' : days <= 7 ? '#f59e0b' : '#16a34a';
+                const color = renewalUrgencyColor(days);
                 return (
                   <div key={r.id} className="sz-sub-list-item">
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
                     <div className="sz-sub-details">
                       <div className="sz-name">{r.name}</div>
                       <div className="sz-meta">Renews in {days} day{days !== 1 ? 's' : ''}</div>
                     </div>
-                    <div className="sz-sub-price" style={{ color: days <= 3 ? '#dc2626' : undefined }}>
-                      {fmtCurrency(getMonthly(r))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {days <= 3 && (
+                        <span style={{ fontSize: 10, fontWeight: 700, background: '#FEF2F2', color: '#dc2626', padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Soon!</span>
+                      )}
+                      <div className="sz-sub-price" style={{ color: days <= 3 ? '#dc2626' : undefined }}>
+                        {fmtCurrency(getMonthly(r))}
+                      </div>
                     </div>
                   </div>
                 );
@@ -182,35 +198,50 @@ export default function Dashboard() {
 
         <div className="sz-card sz-fade-in sz-fade-in-4" style={{ marginBottom: 28 }}>
           {subscriptions.length === 0 ? (
-            <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--sz-gray-500)' }}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>📭</div>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>No subscriptions yet</div>
-              <div style={{ fontSize: 13, marginBottom: 20 }}>Add your first subscription to get started</div>
-              <button className="sz-btn-primary" style={{ fontSize: 14, padding: '10px 24px' }} onClick={() => navigate('/subscriptions')}>
-                Add Subscription →
+            <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>📭</div>
+              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, marginBottom: 8 }}>No subscriptions yet</div>
+              <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 24 }}>Add your first subscription to unlock AI insights, renewal alerts, and spending analytics.</div>
+              <button className="sz-btn-primary" style={{ fontSize: 14, padding: '12px 28px' }} onClick={() => navigate('/subscriptions')}>
+                Add Your First Subscription →
               </button>
             </div>
-          ) : subscriptions.slice(0, 8).map(sub => {
+          ) : subscriptions.slice(0, 8).map((sub, idx) => {
             const icon = sub.icon_emoji || sub.name.charAt(0).toUpperCase();
             const bg = sub.icon_color || '#0A0A0A';
             const isEmoji = icon.length > 1 || icon.charCodeAt(0) > 127;
             const monthly = getMonthly(sub);
             const badgeClass = sub.usage_frequency === 'never' || sub.usage_frequency === 'rare' ? 'sz-badge-unused' : monthly > 1000 ? 'sz-badge-expensive' : 'sz-badge-ok';
             const badgeText = sub.usage_frequency === 'never' || sub.usage_frequency === 'rare' ? 'Low use' : monthly > 1000 ? 'High cost' : 'Active';
+            const days = daysUntil(sub.next_renewal_date);
             return (
-              <div key={sub.id} className="sz-sub-list-item">
+              <div key={sub.id} className="sz-sub-list-item" style={{ animationDelay: `${idx * 0.05}s` }}>
                 <div className="sz-sub-logo" style={{ background: isEmoji ? 'var(--sz-gray-100)' : bg }}>
                   <span style={{ fontSize: isEmoji ? 18 : 13, color: isEmoji ? undefined : 'white', fontWeight: 800 }}>{icon}</span>
                 </div>
                 <div className="sz-sub-details">
                   <div className="sz-name">{sub.name}</div>
-                  <div className="sz-meta">{sub.category} · {sub.billing_cycle.charAt(0).toUpperCase() + sub.billing_cycle.slice(1)} · {sub.usage_frequency.charAt(0).toUpperCase() + sub.usage_frequency.slice(1)}</div>
+                  <div className="sz-meta">{sub.category} · {sub.billing_cycle.charAt(0).toUpperCase() + sub.billing_cycle.slice(1)}</div>
                 </div>
-                <span className={`sz-sub-badge ${badgeClass}`}>{badgeText}</span>
-                <div className="sz-sub-price">{fmtCurrency(monthly)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {days <= 7 && days >= 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, background: days <= 3 ? '#FEF2F2' : '#FFF7ED', color: days <= 3 ? '#dc2626' : '#ea580c', padding: '2px 8px', borderRadius: 100, whiteSpace: 'nowrap' }}>
+                      ⚡ {days}d
+                    </span>
+                  )}
+                  <span className={`sz-sub-badge ${badgeClass}`}>{badgeText}</span>
+                  <div className="sz-sub-price">{fmtCurrency(monthly)}</div>
+                </div>
               </div>
             );
           })}
+          {subscriptions.length > 8 && (
+            <div style={{ padding: '12px 24px', borderTop: '1px solid var(--sz-gray-100)', textAlign: 'center' }}>
+              <button onClick={() => navigate('/subscriptions')} style={{ background: 'none', border: 'none', color: 'var(--sz-accent)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                View all {subscriptions.length} subscriptions →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Cancel Candidates */}
@@ -228,20 +259,42 @@ export default function Dashboard() {
                 const reason = sub.usage_frequency === 'never'
                   ? `You haven't used ${sub.name} at all. This is wasted money.`
                   : `${sub.name} has very low usage. Consider if it's worth the cost.`;
+                const isDeleting = deletingId === sub.id;
                 return (
                   <div key={sub.id} className="sz-cancel-card">
                     <div className="sz-cancel-badge">Cancel Recommended</div>
                     <div className="sz-cancel-name">{sub.name}</div>
                     <div className="sz-cancel-reason">{reason}</div>
                     <div className="sz-cancel-cost">{fmtCurrency(monthly)}/mo</div>
-                    <button className="sz-cancel-btn" onClick={() => handleMarkCancellation(sub.id, sub.name)}>
-                      Mark for Cancellation
+                    <button
+                      className="sz-cancel-btn"
+                      onClick={() => handleMarkCancellation(sub.id, sub.name)}
+                      disabled={isDeleting}
+                      style={{ opacity: isDeleting ? 0.7 : 1 }}
+                    >
+                      {isDeleting ? 'Removing…' : 'Mark for Cancellation'}
                     </button>
                   </div>
                 );
               })}
             </div>
           </>
+        )}
+
+        {/* Insights teaser */}
+        {insights.length > 0 && (
+          <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 24, background: 'var(--sz-black)', borderRadius: 20, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 28 }}>🤖</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>You have {insights.length} AI insight{insights.length !== 1 ? 's' : ''}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Save up to {fmtCurrency(totalSavings / 12)}/mo by acting on them</div>
+              </div>
+            </div>
+            <button className="sz-btn-primary" style={{ background: 'var(--sz-accent)', fontSize: 13, padding: '10px 20px', flexShrink: 0 }} onClick={() => navigate('/insights')}>
+              View Insights →
+            </button>
+          </div>
         )}
       </div>
     </div>

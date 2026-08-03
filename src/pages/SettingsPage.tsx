@@ -6,6 +6,7 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fmtCurrency, toMonthly, downloadCSV } from '@/lib/format';
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -15,6 +16,54 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       onClick={onToggle}
       aria-pressed={on}
     />
+  );
+}
+
+interface DangerModalProps {
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+function DeleteAccountModal({ onConfirm, onCancel, loading }: DangerModalProps) {
+  const [confirm, setConfirm] = useState('');
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(8px)', padding: 20 }}>
+      <div style={{ background: 'white', borderRadius: 28, padding: 40, maxWidth: 440, width: '100%', boxShadow: '0 32px 80px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>⚠️</div>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, marginBottom: 8, color: '#dc2626' }}>Delete Account</div>
+        <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 24, lineHeight: 1.7 }}>
+          This will permanently delete your account and all your subscription data. This action <strong>cannot be undone</strong>.
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, color: 'var(--sz-gray-700)', marginBottom: 8, fontWeight: 600 }}>
+            Type <strong>DELETE</strong> to confirm
+          </div>
+          <input
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            placeholder="DELETE"
+            style={{ width: '100%', border: '1.5px solid #FECACA', borderRadius: 12, padding: '12px 16px', fontSize: 15, fontFamily: "'DM Sans', sans-serif", outline: 'none', textAlign: 'center', boxSizing: 'border-box' }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button onClick={onCancel} className="sz-btn-secondary" style={{ flex: 1 }}>Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={confirm !== 'DELETE' || loading}
+            style={{
+              flex: 1, background: confirm === 'DELETE' ? '#dc2626' : 'var(--sz-gray-200)',
+              color: confirm === 'DELETE' ? 'white' : 'var(--sz-gray-500)', border: 'none',
+              padding: '13px', borderRadius: 100, fontSize: 15, fontWeight: 600,
+              cursor: confirm === 'DELETE' && !loading ? 'pointer' : 'not-allowed',
+              fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s'
+            }}
+          >
+            {loading ? 'Deleting…' : 'Delete Forever'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -34,6 +83,8 @@ export default function SettingsPage() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingNotifs, setSavingNotifs] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -81,6 +132,47 @@ export default function SettingsPage() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (subscriptions.length === 0) {
+      toast.error('No subscriptions to export');
+      return;
+    }
+    const rows = [
+      ['Name', 'Category', 'Cost', 'Billing Cycle', 'Monthly Cost', 'Usage Frequency', 'Next Renewal', 'Notes'],
+      ...subscriptions.map(s => [
+        s.name,
+        s.category,
+        String(s.cost),
+        s.billing_cycle,
+        String(Math.round(toMonthly(s.cost, s.billing_cycle))),
+        s.usage_frequency,
+        s.next_renewal_date || '',
+        s.notes || '',
+      ]),
+    ];
+    downloadCSV(`subzero-subscriptions-${new Date().toISOString().split('T')[0]}.csv`, rows);
+    toast.success(`Exported ${subscriptions.length} subscriptions as CSV`);
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      // Delete user data from Supabase tables
+      await supabase.from('subscriptions').delete().eq('user_id', user!.id);
+      await supabase.from('ai_insights').delete().eq('user_id', user!.id);
+      await supabase.from('user_settings').delete().eq('user_id', user!.id);
+      await supabase.from('users').delete().eq('user_id', user!.id);
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    } catch {
+      toast.error('Failed to delete account. Please contact support.');
+      setDeletingAccount(false);
+    }
+  };
+
+  // Compute total monthly spend for display
+  const totalMonthly = subscriptions.reduce((sum, s) => sum + toMonthly(s.cost, s.billing_cycle), 0);
+
   return (
     <div className="sz-dashboard-layout">
       <Sidebar insightCount={insights.length} />
@@ -90,6 +182,20 @@ export default function SettingsPage() {
           <div style={{ marginBottom: 32 }}>
             <div className="sz-page-heading sz-fade-in sz-fade-in-1">Settings</div>
             <div className="sz-page-sub sz-fade-in sz-fade-in-2">Manage your account and preferences</div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="sz-fade-in sz-fade-in-1" style={{ background: 'var(--sz-black)', borderRadius: 20, padding: '20px 24px', marginBottom: 24, display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Subscriptions', value: subscriptions.length },
+              { label: 'Monthly Spend', value: fmtCurrency(totalMonthly) },
+              { label: 'AI Insights', value: insights.length },
+            ].map(s => (
+              <div key={s.label}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: 'white' }}>{s.value}</div>
+              </div>
+            ))}
           </div>
 
           {/* Profile Section */}
@@ -187,11 +293,28 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {/* Data & Export */}
+          <div className="sz-settings-section sz-fade-in sz-fade-in-3">
+            <div className="sz-settings-header">Data & Export</div>
+            <div style={{ padding: 28 }}>
+              <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 16, lineHeight: 1.7 }}>
+                Export all your subscription data as a CSV file. You can open it in Excel, Google Sheets, or any spreadsheet app.
+              </div>
+              <button
+                className="sz-btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14 }}
+                onClick={handleExportCSV}
+              >
+                📥 Export {subscriptions.length} Subscriptions as CSV
+              </button>
+            </div>
+          </div>
+
           {/* Account */}
           <div className="sz-settings-section sz-fade-in sz-fade-in-4">
             <div className="sz-settings-header">Account</div>
             <div style={{ padding: 28 }}>
-              <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 16 }}>
+              <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 20 }}>
                 Signed in as <strong>{user?.email}</strong>
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -211,8 +334,44 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Danger Zone */}
+          <div className="sz-settings-section sz-fade-in sz-fade-in-4" style={{ border: '1.5px solid #FECACA' }}>
+            <div className="sz-settings-header" style={{ color: '#dc2626', borderBottomColor: '#FECACA' }}>⚠️ Danger Zone</div>
+            <div style={{ padding: 28 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Delete Account</div>
+                  <div style={{ fontSize: 13, color: 'var(--sz-gray-500)', lineHeight: 1.6 }}>
+                    Permanently delete your account and all associated data. This cannot be undone.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  style={{
+                    background: '#FEF2F2', color: '#dc2626', border: '1.5px solid #FECACA',
+                    padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s', flexShrink: 0
+                  }}
+                  onMouseEnter={e => { (e.currentTarget).style.background = '#dc2626'; (e.currentTarget).style.color = 'white'; }}
+                  onMouseLeave={e => { (e.currentTarget).style.background = '#FEF2F2'; (e.currentTarget).style.color = '#dc2626'; }}
+                >
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
+
+      {showDeleteModal && (
+        <DeleteAccountModal
+          onConfirm={handleDeleteAccount}
+          onCancel={() => setShowDeleteModal(false)}
+          loading={deletingAccount}
+        />
+      )}
     </div>
   );
 }
