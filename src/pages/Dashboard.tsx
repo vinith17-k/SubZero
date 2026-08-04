@@ -5,7 +5,7 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { useInsights } from '@/hooks/useInsights';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { fmtCurrency, daysUntil, renewalUrgencyColor } from '@/lib/format';
 import { isTrial, trialDaysLeft } from '@/lib/subscriptionMeta';
 
@@ -116,7 +116,39 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stats grid */}
+        {/* Spend Temperature Gauge (Task 1) */}
+        {(() => {
+          const wasteSpend = activeSubs
+            .filter(s => s.usage_frequency === 'never' || s.usage_frequency === 'rare')
+            .reduce((acc, s) => acc + getMonthly(s), 0);
+          const wastePct = totalMonthly > 0 ? Math.min(100, Math.round((wasteSpend / totalMonthly) * 100)) : 0;
+          const statusText = wastePct < 20 ? 'Optimal Frost · 0-20% Waste' : wastePct < 45 ? 'Cool · Moderate Idle Spend' : wastePct < 70 ? 'Warming · High Unused Spend' : 'Hot Waste Warning · 70%+ Unused';
+          const badgeColor = wastePct < 20 ? '#0284C7' : wastePct < 45 ? '#0369A1' : wastePct < 70 ? '#D97706' : '#DC2626';
+          const badgeBg = wastePct < 20 ? '#E8F4FB' : wastePct < 45 ? '#E0F2FE' : wastePct < 70 ? '#FEF3C7' : '#FEE2E2';
+
+          return (
+            <div className="sz-temp-gauge-card sz-fade-in sz-fade-in-1" style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{wastePct < 30 ? '❄️' : wastePct < 60 ? '🌡️' : '🔥'}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sz-black)' }}>Spend Temperature Gauge</span>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor, background: badgeBg, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.04em' }}>
+                  {statusText}
+                </span>
+              </div>
+              <div className="sz-temp-gauge-bar">
+                <div className="sz-temp-gauge-indicator" style={{ left: `${Math.max(4, Math.min(96, wastePct))}%` }} title={`${wastePct}% of monthly spend is idle/unused`} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--sz-gray-500)', marginTop: 8, fontWeight: 600 }}>
+                <span>❄️ Icy Cool (0% Waste)</span>
+                <span>🔥 Hot Waste ({fmtCurrency(wasteSpend)}/mo idle)</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Stats grid (Task 4: Card Hierarchy Pass) */}
         <div className="sz-stats-grid">
           <div className="sz-stat-card sz-fade-in sz-fade-in-1">
             <div className="sz-stat-label">Monthly Spend</div>
@@ -132,11 +164,13 @@ export default function Dashboard() {
               {fmtCurrency(totalMonthly * 12 / 12)}/mo average
             </div>
           </div>
-          <div className="sz-stat-card sz-fade-in sz-fade-in-3" style={{ background: 'var(--sz-black)' }}>
-            <div className="sz-stat-label" style={{ color: 'rgba(255,255,255,0.4)' }}>Savings Potential</div>
-            <div className="sz-stat-value" style={{ color: 'var(--sz-accent)' }}>{fmtCurrency(totalSavings / 12)}</div>
-            <div className="sz-stat-change" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              {insights.length} AI insight{insights.length !== 1 ? 's' : ''} waiting
+          <div className="sz-stat-card sz-glass-card sz-fade-in sz-fade-in-3" style={{ borderLeft: '4px solid #0284C7' }}>
+            <div className="sz-stat-label" style={{ color: '#0369A1', fontWeight: 700 }}>Savings Potential ✦</div>
+            <div className="sz-stat-value" style={{ color: 'var(--sz-accent)', fontSize: 44, marginTop: 4 }}>
+              {fmtCurrency(totalSavings / 12)}
+            </div>
+            <div className="sz-stat-change" style={{ color: '#0284C7', fontWeight: 600, marginTop: 10 }}>
+              {insights.length} AI insight{insights.length !== 1 ? 's' : ''} action waiting
             </div>
           </div>
         </div>
@@ -152,9 +186,9 @@ export default function Dashboard() {
               </div>
             </div>
             {chartData.length > 0 ? (
-              <div style={{ padding: '0 16px 20px', height: 220 }}>
+              <div style={{ padding: '0 16px 20px', height: 230 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <BarChart data={chartData} margin={{ top: 22, right: 10, left: 0, bottom: 0 }}>
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#8A8A82' }} axisLine={false} tickLine={false} />
                     <YAxis hide />
                     <Tooltip
@@ -162,19 +196,24 @@ export default function Dashboard() {
                       contentStyle={{ background: '#0A0A0A', border: 'none', borderRadius: 10, color: 'white', fontSize: 12 }}
                     />
                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#4A4A44' }} formatter={(v: number) => `₹${v}`} />
                       {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#0A0A0A'} />
+                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || 'var(--temp-hot)'} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--sz-gray-500)' }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📊</div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>No spend data yet</div>
-                <div style={{ fontSize: 13, marginBottom: 20 }}>Add subscriptions to see category breakdown</div>
-                <button className="sz-btn-primary" style={{ fontSize: 13, padding: '10px 20px' }} onClick={() => navigate('/subscriptions')}>+ Add Subscription</button>
+              <div className="sz-frost-empty-state" style={{ margin: 24 }}>
+                <div className="sz-frost-icon-wrap">
+                  <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07L19.07 4.93" />
+                  </svg>
+                </div>
+                <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 4, color: 'var(--sz-black)' }}>No spend data yet</div>
+                <div style={{ fontSize: 13, color: 'var(--sz-gray-500)', marginBottom: 16, maxWidth: 260 }}>Add subscriptions to unlock category temperature analysis.</div>
+                <button className="sz-btn-primary" style={{ fontSize: 13, padding: '9px 18px' }} onClick={() => navigate('/subscriptions')}>+ Add Subscription</button>
               </div>
             )}
           </div>
@@ -292,7 +331,7 @@ export default function Dashboard() {
                   : `${sub.name} has very low usage. Consider if it's worth the cost.`;
                 const isDeleting = deletingId === sub.id;
                 return (
-                  <div key={sub.id} className="sz-cancel-card">
+                  <div key={sub.id} className="sz-cancel-card sz-actionable-card">
                     <div className="sz-cancel-badge">Cancel Recommended</div>
                     <div className="sz-cancel-name">{sub.name}</div>
                     <div className="sz-cancel-reason">{reason}</div>

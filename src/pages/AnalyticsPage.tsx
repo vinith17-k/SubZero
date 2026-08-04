@@ -5,7 +5,7 @@ import { useInsights } from '@/hooks/useInsights';
 import { fmtCurrency } from '@/lib/format';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  LineChart, Line, XAxis, YAxis, CartesianGrid
+  LineChart, Line, XAxis, YAxis, CartesianGrid, LabelList
 } from 'recharts';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -17,15 +17,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const MONTH_VARIANCE = [0.94, 0.97, 0.92, 1.02, 0.98, 1.0];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function DonutCenterLabel({ cx, cy, total }: { cx: number; cy: number; total: number }) {
-  return (
-    <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-      <tspan x={cx} dy="-6" fontSize={12} fill="#8A8A82" fontFamily="'DM Sans', sans-serif">Monthly</tspan>
-      <tspan x={cx} dy={20} fontSize={15} fontWeight={900} fill="#0A0A0A" fontFamily="'Playfair Display', serif">{fmtCurrency(total)}</tspan>
-    </text>
-  );
-}
 
 export default function AnalyticsPage() {
   const {
@@ -111,63 +102,98 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 14, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr', gap: 16, marginBottom: 20 }}>
+          {/* Monthly Spend Trend with value labels and stripe fill */}
           <div className="sz-card sz-fade-in sz-fade-in-2">
-            <div style={{ padding: '20px 20px 6px' }}>
-              <div className="sz-card-title">Monthly Spend Trend</div>
-              <div className="sz-card-subtitle">Last 6 months · dashed = projected</div>
+            <div style={{ padding: '20px 20px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div className="sz-card-title">Monthly Spend Trend</div>
+                <div className="sz-card-subtitle">Last 5 months actual · Next month projected</div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--temp-ice)', color: '#0284C7', padding: '3px 10px', borderRadius: 100 }}>
+                • Real Spend  ┆ Projected
+              </span>
             </div>
-            <div style={{ padding: '0 16px 18px', height: 210 }}>
-              {allSubs.length > 0 ? (
+            <div style={{ padding: '0 16px 18px', height: 220 }}>
+              {allSubs.length >= 3 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <LineChart data={trendData} margin={{ top: 22, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F0EFEC" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#8A8A82' }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#8A8A82' }} axisLine={false} tickLine={false} />
                     <YAxis hide />
                     <Tooltip
                       formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Spend']}
                       contentStyle={{ background: '#0A0A0A', border: 'none', borderRadius: 10, color: 'white', fontSize: 12 }}
                     />
-                    <Line type="monotone" dataKey="spend" stroke="#0A0A0A" strokeWidth={2.5} dot={{ fill: '#0A0A0A', r: 3 }} connectNulls />
-                    <Line type="monotone" dataKey="projected" stroke="#E8541A" strokeWidth={2} strokeDasharray="5 4" dot={{ fill: '#E8541A', r: 3 }} connectNulls />
+                    <Line type="monotone" dataKey="spend" stroke="#0A0A0A" strokeWidth={2.5} dot={{ fill: '#0A0A0A', r: 4 }} connectNulls>
+                      <LabelList dataKey="spend" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0A0A0A' }} formatter={(v: number) => `₹${v}`} />
+                    </Line>
+                    <Line type="monotone" dataKey="projected" stroke="var(--temp-hot)" strokeWidth={2.5} strokeDasharray="5 4" dot={{ fill: 'var(--temp-hot)', r: 4 }} connectNulls>
+                      <LabelList dataKey="projected" position="top" style={{ fontSize: 10, fontWeight: 700, fill: 'var(--temp-hot)' }} formatter={(v: number) => `₹${v} (Est)`} />
+                    </Line>
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sz-gray-500)', fontSize: 13 }}>Add subscriptions to see trend</div>
+                <div className="sz-frost-empty-state" style={{ height: '100%', padding: '20px' }}>
+                  <div className="sz-frost-icon-wrap" style={{ width: 44, height: 44, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>❄️</span>
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 2 }}>Trend Needs More Data</div>
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)', maxWidth: 260 }}>Add at least 3 subscriptions to unlock historical trends & forecasting.</div>
+                </div>
               )}
             </div>
           </div>
 
+          {/* Donut Chart with merged adjacent legend (Task 2) */}
           <div className="sz-card sz-fade-in sz-fade-in-3">
             <div style={{ padding: '20px 20px 6px' }}>
               <div className="sz-card-title">By Category</div>
-              <div className="sz-card-subtitle">Frozen shown as separate slice</div>
+              <div className="sz-card-subtitle">Spending breakdown by category</div>
             </div>
-            <div style={{ padding: '0 16px 18px', height: 210, position: 'relative' }}>
-              {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={78} paddingAngle={3} dataKey="value">
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#8A8A82'} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(v: number) => [`₹${v}`, 'Monthly']}
-                      contentStyle={{ background: '#0A0A0A', border: 'none', borderRadius: 10, color: 'white', fontSize: 12 }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sz-gray-500)', fontSize: 13 }}>No data yet</div>
-              )}
-              {pieData.length > 0 && (
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-                  <div style={{ fontSize: 11, color: '#8A8A82', fontFamily: "'DM Sans', sans-serif" }}>Monthly</div>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: '#0A0A0A', fontFamily: "'Playfair Display', serif" }}>{fmtCurrency(totalMonthly)}</div>
+            {pieData.length > 0 ? (
+              <div style={{ padding: '0 16px 18px', display: 'flex', alignItems: 'center', gap: 12, height: 220 }}>
+                <div style={{ width: 130, height: 130, position: 'relative', flexShrink: 0 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={36} outerRadius={62} paddingAngle={3} dataKey="value">
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#8A8A82'} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                    <div style={{ fontSize: 9, color: '#8A8A82', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total</div>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: '#0A0A0A' }}>{fmtCurrency(totalMonthly)}</div>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {/* Inline Merged Legend */}
+                <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', maxHeight: 180, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {pieData.map(entry => {
+                    const color = CATEGORY_COLORS[entry.name] || '#8A8A82';
+                    const total = totalMonthly + totalFrozenMonthly;
+                    const pct = total > 0 ? Math.round((entry.value / total) * 100) : 0;
+                    return (
+                      <div key={entry.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600, color: 'var(--sz-black)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {entry.name}
+                        </span>
+                        <span style={{ color: 'var(--sz-gray-500)', fontWeight: 600, flexShrink: 0 }}>{pct}%</span>
+                        <span style={{ fontWeight: 700, color: 'var(--sz-black)', flexShrink: 0 }}>{fmtCurrency(entry.value)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="sz-frost-empty-state" style={{ height: 210, margin: 16 }}>
+                <span style={{ fontSize: 28, marginBottom: 6 }}>❄️</span>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>No Category Data</div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -224,8 +224,10 @@ export default function InsightsPage() {
                 const isOverlap = insight.type === 'overlap';
                 const isExpanded = expandedId === insight.id;
 
+                const isActionable = insight.type === 'cancel' || insight.type === 'trial' || insight.type === 'price_hike' || insight.type === 'overlap' || insight.type === 'downgrade';
+
                 return (
-                  <div key={insight.id} className={`sz-rec-item sz-fade-in sz-fade-in-${Math.min(i + 1, 5)}`}
+                  <div key={insight.id} className={`sz-rec-item ${isActionable ? 'sz-actionable-card' : ''} sz-fade-in sz-fade-in-${Math.min(i + 1, 5)}`}
                     style={{ flexDirection: 'column', alignItems: 'stretch' }}>
                     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                       <div className="sz-rec-icon">
