@@ -4,6 +4,11 @@ import { useSubscriptions } from '@/hooks/useSubscriptions';
 import { useInsights } from '@/hooks/useInsights';
 import { toast } from 'sonner';
 import { fmtCurrency, daysUntil } from '@/lib/format';
+import {
+  parseMeta, stringifyMeta, getNotesText, isFrozen, isTrial,
+  trialDaysLeft, recentPriceChange, userShareFraction, VAULT_PRESETS,
+} from '@/lib/subscriptionMeta';
+import type { SubscriptionMeta, SplitMember } from '@/lib/subscriptionMeta';
 import type { Database } from '@/integrations/supabase/types';
 
 type Category = Database['public']['Enums']['subscription_category'];
@@ -13,9 +18,8 @@ type UsageFrequency = Database['public']['Enums']['usage_frequency'];
 const CATEGORIES: Category[] = ['Entertainment', 'Productivity', 'Music', 'Design', 'Cloud', 'Health', 'Education', 'News', 'Other'];
 const BILLING_CYCLES: BillingCycle[] = ['monthly', 'quarterly', 'yearly'];
 const USAGE_FREQS: UsageFrequency[] = ['daily', 'weekly', 'monthly', 'rare', 'never'];
-const COLOR_PRESETS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FFB347', '#E50914', '#1DB954', '#FF0000', '#0078D4'];
+const COLOR_PRESETS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#E50914', '#1DB954', '#FF0000', '#0078D4', '#000', '#F24E1E'];
 
-// Popular service quick-add presets
 const QUICK_SERVICES = [
   { name: 'Netflix', icon_emoji: '🎬', icon_color: '#E50914', category: 'Entertainment' as Category, cost: 649, billing_cycle: 'monthly' as BillingCycle },
   { name: 'Spotify', icon_emoji: '🎵', icon_color: '#1DB954', category: 'Music' as Category, cost: 119, billing_cycle: 'monthly' as BillingCycle },
@@ -28,21 +32,17 @@ const QUICK_SERVICES = [
 ];
 
 type SortOption = 'cost-desc' | 'cost-asc' | 'name' | 'renewal';
+type TabFilter = 'All' | Category | 'Frozen' | 'Trials';
 
-interface ConfirmModalProps {
-  name: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-function ConfirmModal({ name, onConfirm, onCancel }: ConfirmModalProps) {
+// ── Confirm Delete Modal ──────────────────────────────────────────────────────
+function ConfirmModal({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,10,10,0.5)', backdropFilter: 'blur(6px)' }}>
       <div style={{ background: 'white', borderRadius: 24, padding: 36, maxWidth: 380, width: '90%', boxShadow: '0 32px 80px rgba(0,0,0,0.2)', textAlign: 'center' }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🗑️</div>
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 900, marginBottom: 8 }}>Remove Subscription?</div>
         <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 28, lineHeight: 1.6 }}>
-          Are you sure you want to remove <strong>{name}</strong> from tracking? This cannot be undone.
+          Are you sure you want to remove <strong>{name}</strong>? This cannot be undone.
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button onClick={onCancel} className="sz-btn-secondary" style={{ flex: 1 }}>Cancel</button>
@@ -53,16 +53,19 @@ function ConfirmModal({ name, onConfirm, onCancel }: ConfirmModalProps) {
   );
 }
 
+// ── Add / Edit Modal ──────────────────────────────────────────────────────────
 interface AddModalProps {
   onClose: () => void;
   editData?: ReturnType<typeof useSubscriptions>['data'] extends (infer T)[] ? T : never;
 }
 
 function AddSubscriptionModal({ onClose, editData }: AddModalProps) {
-  const { addSubscription, updateSubscription } = useSubscriptions();
+  const { addSubscription, updateSubscription, updateCost } = useSubscriptions();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 30);
   const defaultDate = tomorrow.toISOString().split('T')[0];
+
+  const existingMeta: SubscriptionMeta = editData ? parseMeta(editData.notes) : {};
 
   const [form, setForm] = useState({
     name: editData?.name ?? '',
@@ -73,11 +76,21 @@ function AddSubscriptionModal({ onClose, editData }: AddModalProps) {
     icon_color: editData?.icon_color ?? '#0A0A0A',
     usage_frequency: (editData?.usage_frequency ?? 'monthly') as UsageFrequency,
     category: (editData?.category ?? 'Entertainment') as Category,
-    notes: editData?.notes ?? '',
+    // Meta fields
+    notes_text: existingMeta.notes_text ?? '',
+    is_trial: existingMeta.is_trial ?? false,
+    trial_end_date: existingMeta.trial_end_date ?? '',
+    login_url: existingMeta.login_url ?? '',
+    cancel_url: existingMeta.cancel_url ?? '',
+    user_share_pct: existingMeta.user_share_pct ?? 100,
+    split_members: existingMeta.split_members ?? [] as SplitMember[],
+    is_split: (existingMeta.user_share_pct ?? 100) < 100,
   });
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'basic' | 'trial' | 'vault' | 'split'>('basic');
 
   const applyQuickService = (svc: typeof QUICK_SERVICES[0]) => {
+    const preset = VAULT_PRESETS[svc.name] ?? {};
     setForm(f => ({
       ...f,
       name: svc.name,
@@ -86,22 +99,100 @@ function AddSubscriptionModal({ onClose, editData }: AddModalProps) {
       category: svc.category,
       cost: svc.cost.toString(),
       billing_cycle: svc.billing_cycle,
+      login_url: preset.login_url ?? f.login_url,
+      cancel_url: preset.cancel_url ?? f.cancel_url,
     }));
+  };
+
+  const addSplitMember = () => {
+    setForm(f => {
+      const memberCount = f.split_members.length + 1; // +1 for the user
+      const equalShare = Math.floor(100 / (memberCount + 1));
+      const newMembers = [...f.split_members, { name: '', share_pct: equalShare }];
+      const userShare = 100 - newMembers.reduce((s, m) => s + m.share_pct, 0);
+      return { ...f, split_members: newMembers, user_share_pct: Math.max(0, userShare), is_split: true };
+    });
+  };
+
+  const updateSplitMember = (idx: number, field: keyof SplitMember, value: string | number) => {
+    setForm(f => {
+      const members = f.split_members.map((m, i) => i === idx ? { ...m, [field]: value } : m);
+      const othersTotal = members.reduce((s, m) => s + Number(m.share_pct), 0);
+      return { ...f, split_members: members, user_share_pct: Math.max(0, 100 - othersTotal) };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { toast.error('Please enter a service name'); return; }
     if (!form.cost || isNaN(Number(form.cost))) { toast.error('Please enter a valid cost'); return; }
-    if (!form.next_renewal_date) { toast.error('Please select a renewal date'); return; }
+    if (!form.next_renewal_date && !form.is_trial) { toast.error('Please select a renewal date'); return; }
+
+    const newCost = Number(form.cost);
+    const meta: SubscriptionMeta = {
+      notes_text: form.notes_text || undefined,
+      is_trial: form.is_trial || undefined,
+      trial_end_date: form.is_trial ? form.trial_end_date || undefined : undefined,
+      login_url: form.login_url || undefined,
+      cancel_url: form.cancel_url || undefined,
+      user_share_pct: form.is_split ? form.user_share_pct : undefined,
+      split_members: form.is_split && form.split_members.length > 0 ? form.split_members : undefined,
+      price_history: existingMeta.price_history, // preserve history
+      is_frozen: existingMeta.is_frozen,
+      frozen_at: existingMeta.frozen_at,
+    };
 
     setSaving(true);
     try {
       if (editData) {
-        await updateSubscription.mutateAsync({ id: editData.id, ...form, cost: Number(form.cost) });
+        // Log price change if cost changed
+        if (newCost !== editData.cost) {
+          const updatedMeta = {
+            ...meta,
+            price_history: [
+              ...(existingMeta.price_history ?? []),
+              { old_cost: editData.cost, new_cost: newCost, changed_at: new Date().toISOString() }
+            ].slice(-10),
+          };
+          await updateSubscription.mutateAsync({
+            id: editData.id,
+            name: form.name,
+            cost: newCost,
+            billing_cycle: form.billing_cycle,
+            next_renewal_date: form.next_renewal_date || null,
+            icon_emoji: form.icon_emoji || null,
+            icon_color: form.icon_color,
+            usage_frequency: form.usage_frequency,
+            category: form.category,
+            notes: stringifyMeta(updatedMeta),
+          });
+        } else {
+          await updateSubscription.mutateAsync({
+            id: editData.id,
+            name: form.name,
+            cost: newCost,
+            billing_cycle: form.billing_cycle,
+            next_renewal_date: form.next_renewal_date || null,
+            icon_emoji: form.icon_emoji || null,
+            icon_color: form.icon_color,
+            usage_frequency: form.usage_frequency,
+            category: form.category,
+            notes: stringifyMeta(meta),
+          });
+        }
         toast.success('Subscription updated ✓');
       } else {
-        await addSubscription.mutateAsync({ ...form, cost: Number(form.cost) });
+        await addSubscription.mutateAsync({
+          name: form.name,
+          cost: newCost,
+          billing_cycle: form.billing_cycle,
+          next_renewal_date: form.next_renewal_date || null,
+          icon_emoji: form.icon_emoji || null,
+          icon_color: form.icon_color,
+          usage_frequency: form.usage_frequency,
+          category: form.category,
+          notes: stringifyMeta(meta),
+        });
         toast.success('Subscription added ✓');
       }
       onClose();
@@ -112,113 +203,235 @@ function AddSubscriptionModal({ onClose, editData }: AddModalProps) {
     }
   };
 
+  const tabStyle = (t: typeof activeTab) => ({
+    padding: '7px 14px', borderRadius: 100, border: 'none', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', background: activeTab === t ? '#0A0A0A' : 'transparent',
+    color: activeTab === t ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s',
+    fontFamily: "'DM Sans', sans-serif",
+  });
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(10,10,10,0.6)', backdropFilter: 'blur(8px)', padding: 20 }}>
-      <div style={{ background: 'var(--sz-bg)', borderRadius: 28, padding: 40, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>{editData ? 'Edit Subscription' : 'Add Subscription'}</div>
-            <div style={{ fontSize: 13, color: 'var(--sz-gray-500)', marginTop: 4 }}>Track a new recurring expense</div>
+      <div style={{ background: 'var(--sz-bg)', borderRadius: 28, padding: 36, width: '100%', maxWidth: 580, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900 }}>
+            {editData ? 'Edit Subscription' : 'Add Subscription'}
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--sz-gray-500)', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: 'var(--sz-gray-500)' }}>✕</button>
         </div>
 
+        {/* Quick-add */}
         {!editData && (
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--sz-gray-500)', marginBottom: 10 }}>Quick Add Popular Services</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--sz-gray-500)', marginBottom: 8 }}>Quick Add</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {QUICK_SERVICES.map(svc => (
-                <button
-                  key={svc.name}
-                  type="button"
-                  onClick={() => applyQuickService(svc)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-                    border: form.name === svc.name ? '1.5px solid var(--sz-black)' : '1.5px solid var(--sz-gray-200)',
-                    borderRadius: 100, background: form.name === svc.name ? 'var(--sz-black)' : 'white',
-                    color: form.name === svc.name ? 'white' : 'var(--sz-gray-700)',
-                    fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s',
-                    fontFamily: "'DM Sans', sans-serif"
-                  }}
-                >
-                  <span>{svc.icon_emoji}</span>
-                  <span>{svc.name}</span>
+                <button key={svc.name} type="button" onClick={() => applyQuickService(svc)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', border: form.name === svc.name ? '1.5px solid #0A0A0A' : '1.5px solid var(--sz-gray-200)', borderRadius: 100, background: form.name === svc.name ? '#0A0A0A' : 'white', color: form.name === svc.name ? 'white' : 'var(--sz-gray-700)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                  {svc.icon_emoji} {svc.name}
                 </button>
               ))}
             </div>
           </div>
         )}
 
+        {/* Section tabs */}
+        <div style={{ display: 'flex', background: 'var(--sz-gray-100)', borderRadius: 100, padding: 4, gap: 2, marginBottom: 24 }}>
+          {(['basic', 'trial', 'vault', 'split'] as const).map(t => (
+            <button key={t} type="button" style={tabStyle(t)} onClick={() => setActiveTab(t)}>
+              {t === 'basic' ? '📋 Details' : t === 'trial' ? '⏳ Trial' : t === 'vault' ? '🔗 Vault' : '👥 Split'}
+            </button>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 20 }}>
-            <label className="sz-field-label">Service Name</label>
-            <input className="sz-field-input" type="text" placeholder="e.g. Netflix, Spotify, Adobe…" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
+          {/* ── BASIC TAB ── */}
+          {activeTab === 'basic' && (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <label className="sz-field-label">Service Name</label>
+                <input className="sz-field-input" type="text" placeholder="e.g. Netflix, Spotify…" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label className="sz-field-label">Cost (₹)</label>
+                  <input className="sz-field-input" type="number" placeholder="0.00" min="0" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="sz-field-label">Billing Cycle</label>
+                  <select className="sz-field-input" value={form.billing_cycle} onChange={e => setForm(f => ({ ...f, billing_cycle: e.target.value as BillingCycle }))}>
+                    {BILLING_CYCLES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label className="sz-field-label">Next Renewal</label>
+                  <input className="sz-field-input" type="date" value={form.next_renewal_date} onChange={e => setForm(f => ({ ...f, next_renewal_date: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="sz-field-label">Usage Frequency</label>
+                  <select className="sz-field-input" value={form.usage_frequency} onChange={e => setForm(f => ({ ...f, usage_frequency: e.target.value as UsageFrequency }))}>
+                    {USAGE_FREQS.map(u => <option key={u} value={u}>{u.charAt(0).toUpperCase() + u.slice(1)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label className="sz-field-label">Category</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 6 }}>
+                  {CATEGORIES.map(cat => (
+                    <button key={cat} type="button" className={`sz-category-chip ${form.category === cat ? 'sz-selected' : ''}`} onClick={() => setForm(f => ({ ...f, category: cat }))}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                <div>
+                  <label className="sz-field-label">Icon Emoji</label>
+                  <input className="sz-field-input" type="text" placeholder="🎬" maxLength={4} value={form.icon_emoji} onChange={e => setForm(f => ({ ...f, icon_emoji: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="sz-field-label">Icon Color</label>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
+                    {COLOR_PRESETS.slice(0, 8).map(c => (
+                      <button key={c} type="button" onClick={() => setForm(f => ({ ...f, icon_color: c }))}
+                        style={{ width: 26, height: 26, background: c, borderRadius: 7, border: form.icon_color === c ? '3px solid #0A0A0A' : '2px solid transparent', cursor: 'pointer', transition: 'transform 0.15s' }}
+                        onMouseEnter={e => { (e.currentTarget).style.transform = 'scale(1.15)'; }}
+                        onMouseLeave={e => { (e.currentTarget).style.transform = 'scale(1)'; }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label className="sz-field-label">Notes</label>
+                <textarea className="sz-field-input" rows={2} placeholder="Any notes…" style={{ resize: 'vertical' }} value={form.notes_text} onChange={e => setForm(f => ({ ...f, notes_text: e.target.value }))} />
+              </div>
+            </>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          {/* ── TRIAL TAB ── */}
+          {activeTab === 'trial' && (
             <div>
-              <label className="sz-field-label">Cost (₹)</label>
-              <input className="sz-field-input" type="number" placeholder="0.00" min="0" step="0.01" value={form.cost} onChange={e => setForm(f => ({ ...f, cost: e.target.value }))} />
+              <div style={{ background: '#FFF7ED', borderRadius: 16, padding: 20, marginBottom: 20, borderLeft: '4px solid #F59E0B' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#92400E', marginBottom: 4 }}>⏳ Free Trial Tracking</div>
+                <div style={{ fontSize: 13, color: '#92400E', lineHeight: 1.6 }}>Mark this subscription as a free trial. SubZero will countdown to the trial end date and alert you before it converts.</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '14px 18px', border: '1.5px solid var(--sz-gray-200)', borderRadius: 14 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>This is a free trial</div>
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Enable trial countdown badge</div>
+                </div>
+                <button type="button" className={`sz-toggle ${form.is_trial ? 'sz-on' : ''}`} onClick={() => setForm(f => ({ ...f, is_trial: !f.is_trial }))} />
+              </div>
+              {form.is_trial && (
+                <div>
+                  <label className="sz-field-label">Trial End Date</label>
+                  <input className="sz-field-input" type="date" value={form.trial_end_date} onChange={e => setForm(f => ({ ...f, trial_end_date: e.target.value }))} />
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)', marginTop: 6 }}>You'll get an AI Insight 3 days before this date.</div>
+                </div>
+              )}
             </div>
-            <div>
-              <label className="sz-field-label">Billing Cycle</label>
-              <select className="sz-field-input" value={form.billing_cycle} onChange={e => setForm(f => ({ ...f, billing_cycle: e.target.value as BillingCycle }))}>
-                {BILLING_CYCLES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          {/* ── VAULT TAB ── */}
+          {activeTab === 'vault' && (
             <div>
-              <label className="sz-field-label">Next Renewal</label>
-              <input className="sz-field-input" type="date" value={form.next_renewal_date} onChange={e => setForm(f => ({ ...f, next_renewal_date: e.target.value }))} />
-            </div>
-            <div>
-              <label className="sz-field-label">Usage Frequency</label>
-              <select className="sz-field-input" value={form.usage_frequency} onChange={e => setForm(f => ({ ...f, usage_frequency: e.target.value as UsageFrequency }))}>
-                {USAGE_FREQS.map(u => <option key={u} value={u}>{u.charAt(0).toUpperCase() + u.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label className="sz-field-label">Category</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 4 }}>
-              {CATEGORIES.map(cat => (
-                <button key={cat} type="button" className={`sz-category-chip ${form.category === cat ? 'sz-selected' : ''}`} onClick={() => setForm(f => ({ ...f, category: cat }))}>
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <div>
-              <label className="sz-field-label">Icon Emoji</label>
-              <input className="sz-field-input" type="text" placeholder="📺" maxLength={4} value={form.icon_emoji} onChange={e => setForm(f => ({ ...f, icon_emoji: e.target.value }))} />
-            </div>
-            <div>
-              <label className="sz-field-label">Icon Color</label>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                {COLOR_PRESETS.slice(0, 8).map(c => (
-                  <button key={c} type="button" onClick={() => setForm(f => ({ ...f, icon_color: c }))}
-                    style={{ width: 28, height: 28, background: c, borderRadius: 7, border: form.icon_color === c ? '3px solid #0A0A0A' : '2px solid transparent', cursor: 'pointer', transition: 'transform 0.2s' }}
-                    onMouseEnter={e => { (e.currentTarget).style.transform = 'scale(1.15)'; }}
-                    onMouseLeave={e => { (e.currentTarget).style.transform = 'scale(1)'; }}
-                  />
-                ))}
+              <div style={{ background: '#EFF6FF', borderRadius: 16, padding: 20, marginBottom: 20, borderLeft: '4px solid #3B82F6' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#1E3A5F', marginBottom: 4 }}>🔗 Subscription Vault</div>
+                <div style={{ fontSize: 13, color: '#1E3A5F', lineHeight: 1.6 }}>Save quick-access links. When you click "Manage" on a subscription card, these links open directly.</div>
+              </div>
+              {VAULT_PRESETS[form.name] && (
+                <div style={{ marginBottom: 16 }}>
+                  <button type="button" onClick={() => {
+                    const p = VAULT_PRESETS[form.name];
+                    setForm(f => ({ ...f, login_url: p.login_url ?? '', cancel_url: p.cancel_url ?? '' }));
+                    toast.success('Pre-filled vault links for ' + form.name);
+                  }}
+                    style={{ background: '#0A0A0A', color: 'white', border: 'none', padding: '8px 18px', borderRadius: 100, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                    ⚡ Auto-fill {form.name} links
+                  </button>
+                </div>
+              )}
+              <div style={{ marginBottom: 16 }}>
+                <label className="sz-field-label">Login URL</label>
+                <input className="sz-field-input" type="url" placeholder="https://…" value={form.login_url} onChange={e => setForm(f => ({ ...f, login_url: e.target.value }))} />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label className="sz-field-label">Cancellation URL</label>
+                <input className="sz-field-input" type="url" placeholder="https://…/cancel" value={form.cancel_url} onChange={e => setForm(f => ({ ...f, cancel_url: e.target.value }))} />
               </div>
             </div>
-          </div>
+          )}
 
-          <div style={{ marginBottom: 24 }}>
-            <label className="sz-field-label">Notes (optional)</label>
-            <textarea className="sz-field-input" rows={2} placeholder="Any notes…" style={{ resize: 'vertical' }} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-          </div>
+          {/* ── SPLIT TAB ── */}
+          {activeTab === 'split' && (
+            <div>
+              <div style={{ background: '#F0FDF4', borderRadius: 16, padding: 20, marginBottom: 20, borderLeft: '4px solid #16A34A' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#14532D', marginBottom: 4 }}>👥 Household Split</div>
+                <div style={{ fontSize: 13, color: '#14532D', lineHeight: 1.6 }}>Share this subscription cost. Your totals in Dashboard and Analytics will show only your share.</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, padding: '14px 18px', border: '1.5px solid var(--sz-gray-200)', borderRadius: 14 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Split with others</div>
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Divide cost across people</div>
+                </div>
+                <button type="button" className={`sz-toggle ${form.is_split ? 'sz-on' : ''}`} onClick={() => setForm(f => ({
+                  ...f, is_split: !f.is_split,
+                  split_members: !f.is_split ? [] : f.split_members,
+                  user_share_pct: !f.is_split ? 50 : 100,
+                }))} />
+              </div>
+              {form.is_split && (
+                <>
+                  <div style={{ background: 'var(--sz-gray-100)', borderRadius: 14, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>You</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, fontFamily: "'Playfair Display', serif", color: '#16a34a' }}>{form.user_share_pct}%</span>
+                  </div>
+                  {form.split_members.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+                      <input
+                        className="sz-field-input"
+                        style={{ flex: 2 }}
+                        placeholder="Person's name"
+                        value={m.name}
+                        onChange={e => updateSplitMember(i, 'name', e.target.value)}
+                      />
+                      <div style={{ position: 'relative', flex: 1 }}>
+                        <input
+                          className="sz-field-input"
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={m.share_pct}
+                          onChange={e => updateSplitMember(i, 'share_pct', Number(e.target.value))}
+                          style={{ paddingRight: 28 }}
+                        />
+                        <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--sz-gray-500)' }}>%</span>
+                      </div>
+                      <button type="button" onClick={() => setForm(f => {
+                        const members = f.split_members.filter((_, j) => j !== i);
+                        const othersTotal = members.reduce((s, mm) => s + mm.share_pct, 0);
+                        return { ...f, split_members: members, user_share_pct: Math.max(0, 100 - othersTotal) };
+                      })} style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 18, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addSplitMember}
+                    style={{ width: '100%', border: '1.5px dashed var(--sz-gray-300)', borderRadius: 12, padding: '10px', background: 'none', fontSize: 13, color: 'var(--sz-gray-500)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}>
+                    + Add Person
+                  </button>
+                  <div style={{ marginTop: 12, padding: 14, background: '#F0FDF4', borderRadius: 12, fontSize: 13, color: '#14532D' }}>
+                    <strong>Your monthly cost:</strong> {fmtCurrency(Number(form.cost || 0) * (form.user_share_pct / 100) / (form.billing_cycle === 'yearly' ? 12 : form.billing_cycle === 'quarterly' ? 3 : 1))}
+                    {' '}(of {fmtCurrency(Number(form.cost || 0) / (form.billing_cycle === 'yearly' ? 12 : form.billing_cycle === 'quarterly' ? 3 : 1))} total)
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button type="submit" className="sz-btn-primary" style={{ flex: 1, padding: 14 }} disabled={saving}>
-              {saving ? 'Saving…' : editData ? 'Update Subscription →' : 'Add Subscription →'}
+              {saving ? 'Saving…' : editData ? 'Update →' : 'Add Subscription →'}
             </button>
             <button type="button" className="sz-btn-secondary" onClick={onClose}>Cancel</button>
           </div>
@@ -228,91 +441,114 @@ function AddSubscriptionModal({ onClose, editData }: AddModalProps) {
   );
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SubscriptionsPage() {
-  const { data: subscriptions = [], deleteSubscription, getMonthly } = useSubscriptions();
-  const { data: insights = [] } = useInsights(subscriptions);
-  const [activeCategory, setActiveCategory] = useState<'All' | Category>('All');
+  const {
+    data: allSubs = [], activeSubs, frozenSubs, trialSubs,
+    deleteSubscription, getMonthly, getFullMonthly, totalMonthly,
+    freezeSubscription, unfreezeSubscription,
+  } = useSubscriptions();
+  const { data: insights = [] } = useInsights(allSubs);
+
+  const [tab, setTab] = useState<TabFilter>('All');
   const [showModal, setShowModal] = useState(false);
-  const [editSub, setEditSub] = useState<typeof subscriptions[number] | undefined>();
+  const [editSub, setEditSub] = useState<typeof allSubs[number] | undefined>();
   const [isYearly, setIsYearly] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOption>('cost-desc');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
+  const [dismissedLocalInsights, setDismissedLocalInsights] = useState<Set<string>>(new Set());
+  const [expandedCompare, setExpandedCompare] = useState<string | null>(null);
+
+  const displaySubs = tab === 'Frozen' ? frozenSubs
+    : tab === 'Trials' ? trialSubs
+    : tab === 'All' ? allSubs
+    : allSubs.filter(s => s.category === tab);
 
   const filtered = useMemo(() => {
-    let subs = activeCategory === 'All' ? subscriptions : subscriptions.filter(s => s.category === activeCategory);
+    let subs = displaySubs;
     if (search.trim()) {
       const q = search.toLowerCase();
       subs = subs.filter(s => s.name.toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q));
     }
-    subs = [...subs].sort((a, b) => {
-      if (sort === 'cost-desc') return getMonthly(b) - getMonthly(a);
-      if (sort === 'cost-asc') return getMonthly(a) - getMonthly(b);
+    return [...subs].sort((a, b) => {
+      if (sort === 'cost-desc') return getFullMonthly(b) - getFullMonthly(a);
+      if (sort === 'cost-asc') return getFullMonthly(a) - getFullMonthly(b);
       if (sort === 'name') return a.name.localeCompare(b.name);
       if (sort === 'renewal') return daysUntil(a.next_renewal_date) - daysUntil(b.next_renewal_date);
       return 0;
     });
-    return subs;
-  }, [subscriptions, activeCategory, search, sort, getMonthly]);
+  }, [displaySubs, search, sort, getFullMonthly]);
 
-  const handleDelete = async (id: string, name: string) => {
-    setConfirmDelete({ id, name });
-  };
+  const handleDelete = (id: string, name: string) => setConfirmDelete({ id, name });
 
   const confirmDeleteAction = async () => {
     if (!confirmDelete) return;
     try {
       await deleteSubscription.mutateAsync(confirmDelete.id);
       toast.success(`${confirmDelete.name} removed ✓`);
-    } catch {
-      toast.error('Failed to remove');
-    } finally {
-      setConfirmDelete(null);
-    }
+    } catch { toast.error('Failed to remove'); }
+    finally { setConfirmDelete(null); }
   };
 
-  const totalMonthly = subscriptions.reduce((sum, s) => sum + getMonthly(s), 0);
+  const handleFreeze = async (sub: typeof allSubs[number]) => {
+    const frozen = isFrozen(sub.notes);
+    try {
+      if (frozen) {
+        await unfreezeSubscription.mutateAsync({ id: sub.id, currentNotes: sub.notes });
+        toast.success(`${sub.name} unfrozen — counting again ✓`);
+      } else {
+        await freezeSubscription.mutateAsync({ id: sub.id, currentNotes: sub.notes });
+        toast.success(`${sub.name} frozen ❄️ — excluded from totals`);
+      }
+    } catch { toast.error('Failed to update subscription'); }
+  };
+
+  const tabBtnStyle = (t: TabFilter) => ({
+    padding: '7px 16px', borderRadius: 100, border: 'none', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', background: tab === t ? '#0A0A0A' : 'transparent',
+    color: tab === t ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s',
+    fontFamily: "'DM Sans', sans-serif",
+  });
 
   return (
     <div className="sz-dashboard-layout">
       <Sidebar insightCount={insights.length} />
 
       <div className="sz-main-content">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <div className="sz-page-heading sz-fade-in sz-fade-in-1">Subscriptions</div>
-            <div className="sz-page-sub sz-fade-in sz-fade-in-2">{subscriptions.length} active · {fmtCurrency(totalMonthly)}/mo total</div>
-          </div>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {/* Monthly/Yearly toggle */}
-            <div style={{ display: 'flex', background: 'var(--sz-gray-200)', borderRadius: 100, padding: 4 }}>
-              <button onClick={() => setIsYearly(false)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: !isYearly ? '#0A0A0A' : 'transparent', color: !isYearly ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>Monthly</button>
-              <button onClick={() => setIsYearly(true)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: isYearly ? '#0A0A0A' : 'transparent', color: isYearly ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>Yearly</button>
+            <div className="sz-page-sub sz-fade-in sz-fade-in-2">
+              {activeSubs.length} active · {fmtCurrency(totalMonthly)}/mo
+              {frozenSubs.length > 0 && <span style={{ marginLeft: 8, color: '#93C5FD', fontWeight: 600 }}>❄️ {frozenSubs.length} frozen</span>}
+              {trialSubs.length > 0 && <span style={{ marginLeft: 8, color: '#F59E0B', fontWeight: 600 }}>⏳ {trialSubs.length} trial</span>}
             </div>
-            <button className="sz-btn-primary" style={{ fontSize: 14, padding: '10px 20px' }} onClick={() => { setEditSub(undefined); setShowModal(true); }}>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', background: 'var(--sz-gray-200)', borderRadius: 100, padding: 3 }}>
+              <button onClick={() => setIsYearly(false)} style={{ padding: '5px 13px', borderRadius: 100, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: !isYearly ? '#0A0A0A' : 'transparent', color: !isYearly ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>Monthly</button>
+              <button onClick={() => setIsYearly(true)} style={{ padding: '5px 13px', borderRadius: 100, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: isYearly ? '#0A0A0A' : 'transparent', color: isYearly ? 'white' : 'var(--sz-gray-500)', transition: 'all 0.2s', fontFamily: "'DM Sans', sans-serif" }}>Yearly</button>
+            </div>
+            <button className="sz-btn-primary" style={{ fontSize: 13, padding: '9px 18px' }} onClick={() => { setEditSub(undefined); setShowModal(true); }}>
               + Add Subscription
             </button>
           </div>
         </div>
 
-        {/* Search + Sort row */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-            <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--sz-gray-300)', fontSize: 16 }}>🔍</span>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search subscriptions…"
-              style={{ width: '100%', border: '1.5px solid var(--sz-gray-200)', borderRadius: 100, padding: '9px 16px 9px 40px', fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: 'white', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+        {/* Search + Sort */}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+            <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--sz-gray-300)', fontSize: 15 }}>🔍</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search subscriptions…"
+              style={{ width: '100%', border: '1.5px solid var(--sz-gray-200)', borderRadius: 100, padding: '8px 16px 8px 38px', fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: 'none', background: 'white', boxSizing: 'border-box' }}
               onFocus={e => { e.currentTarget.style.borderColor = '#0A0A0A'; }}
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--sz-gray-200)'; }}
             />
           </div>
-          <select
-            value={sort}
-            onChange={e => setSort(e.target.value as SortOption)}
-            style={{ border: '1.5px solid var(--sz-gray-200)', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: 'none', background: 'white', cursor: 'pointer', color: 'var(--sz-gray-700)' }}
-          >
+          <select value={sort} onChange={e => setSort(e.target.value as SortOption)}
+            style={{ border: '1.5px solid var(--sz-gray-200)', borderRadius: 100, padding: '8px 16px', fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: 'none', background: 'white', cursor: 'pointer' }}>
             <option value="cost-desc">Sort: Highest cost</option>
             <option value="cost-asc">Sort: Lowest cost</option>
             <option value="name">Sort: Name A–Z</option>
@@ -320,79 +556,175 @@ export default function SubscriptionsPage() {
           </select>
         </div>
 
-        {/* Category Filter */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-          {(['All', ...CATEGORIES] as const).map(cat => (
-            <button key={cat} className={`sz-filter-tab ${activeCategory === cat ? 'sz-active' : ''}`} onClick={() => setActiveCategory(cat as typeof activeCategory)}>
-              {cat}
-            </button>
+        {/* Tab filters */}
+        <div style={{ display: 'flex', background: 'var(--sz-gray-100)', borderRadius: 100, padding: 3, gap: 2, marginBottom: 24, flexWrap: 'wrap' }}>
+          <button style={tabBtnStyle('All')} onClick={() => setTab('All')}>All ({allSubs.length})</button>
+          {frozenSubs.length > 0 && <button style={tabBtnStyle('Frozen')} onClick={() => setTab('Frozen')}>❄️ Frozen ({frozenSubs.length})</button>}
+          {trialSubs.length > 0 && <button style={tabBtnStyle('Trials')} onClick={() => setTab('Trials')}>⏳ Trials ({trialSubs.length})</button>}
+          {CATEGORIES.filter(c => allSubs.some(s => s.category === c)).map(cat => (
+            <button key={cat} style={tabBtnStyle(cat)} onClick={() => setTab(cat)}>{cat}</button>
           ))}
         </div>
 
-        {/* Subscriptions Grid */}
+        {/* Cards */}
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 40px', color: 'var(--sz-gray-500)' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>{search ? '🔍' : '📭'}</div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, color: '#0A0A0A', marginBottom: 8 }}>
-              {search ? `No results for "${search}"` : 'No subscriptions here'}
+            <div style={{ fontSize: 48, marginBottom: 16 }}>{search ? '🔍' : tab === 'Frozen' ? '❄️' : '📭'}</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, color: '#0A0A0A', marginBottom: 8 }}>
+              {search ? `No results for "${search}"` : tab === 'Frozen' ? 'No frozen subscriptions' : 'No subscriptions here'}
             </div>
             <div style={{ fontSize: 14, marginBottom: 24 }}>
               {search ? 'Try a different search term' : 'Add your first subscription to start tracking'}
             </div>
-            {!search && <button className="sz-btn-primary" onClick={() => setShowModal(true)}>+ Add Subscription</button>}
+            {!search && tab === 'All' && <button className="sz-btn-primary" onClick={() => setShowModal(true)}>+ Add Subscription</button>}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 40 }}>
             {filtered.map((sub, idx) => {
+              const meta = parseMeta(sub.notes);
+              const frozen = isFrozen(sub.notes);
+              const trial = isTrial(sub.notes);
+              const trialDays = trialDaysLeft(sub.notes);
+              const priceChange = recentPriceChange(sub.notes);
               const icon = sub.icon_emoji || sub.name.charAt(0).toUpperCase();
               const bg = sub.icon_color || '#0A0A0A';
               const isEmoji = icon.length > 1 || icon.charCodeAt(0) > 127;
-              const monthly = getMonthly(sub);
-              const displayCost = isYearly ? monthly * 12 : monthly;
-              const renewalDate = sub.next_renewal_date ? new Date(sub.next_renewal_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+              const fullMonthly = getFullMonthly(sub);
+              const userMonthly = getMonthly(sub);
+              const displayCost = isYearly ? (isFrozen(sub.notes) ? fullMonthly * 12 : userMonthly * 12) : (isFrozen(sub.notes) ? fullMonthly : userMonthly);
               const days = daysUntil(sub.next_renewal_date);
-              const badgeClass = sub.usage_frequency === 'never' || sub.usage_frequency === 'rare' ? 'sz-badge-unused' : monthly > 1000 ? 'sz-badge-expensive' : 'sz-badge-ok';
-              const badgeText = sub.usage_frequency === 'never' ? 'Unused' : sub.usage_frequency === 'rare' ? 'Rarely used' : monthly > 1000 ? 'High cost' : 'Active';
+              const hasVault = meta.login_url || meta.cancel_url;
+              const isSplit = (meta.user_share_pct ?? 100) < 100;
+              const sharePct = meta.user_share_pct ?? 100;
+              const [vaultOpen, setVaultOpen] = useState(false);
 
               return (
-                <div key={sub.id} className="sz-card sz-fade-in" style={{ padding: 24, animationDelay: `${idx * 0.04}s`, opacity: 0, animationFillMode: 'forwards' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 14, background: isEmoji ? 'var(--sz-gray-100)' : bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: isEmoji ? 22 : 16, color: isEmoji ? undefined : 'white', fontWeight: 800 }}>{icon}</span>
+                <div
+                  key={sub.id}
+                  className={`sz-card sz-fade-in ${frozen ? 'sz-frozen-card' : ''}`}
+                  style={{ padding: 22, animationDelay: `${idx * 0.04}s`, opacity: 0, animationFillMode: 'forwards', position: 'relative' }}
+                >
+                  {/* Frozen snowflake badge */}
+                  {frozen && (
+                    <div style={{ position: 'absolute', top: 12, right: 12, background: '#DBEAFE', color: '#1D4ED8', borderRadius: 100, padding: '2px 8px', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      ❄️ Frozen
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  )}
+                  {/* Trial badge */}
+                  {trial && trialDays !== null && trialDays >= 0 && !frozen && (
+                    <div style={{ position: 'absolute', top: 12, right: 12, background: trialDays <= 1 ? '#FEF2F2' : '#FFF7ED', color: trialDays <= 1 ? '#dc2626' : '#ea580c', borderRadius: 100, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>
+                      ⏳ {trialDays === 0 ? 'Ends today!' : `${trialDays}d trial`}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 13, background: isEmoji ? 'var(--sz-gray-100)' : bg, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: frozen ? 'grayscale(0.7)' : 'none' }}>
+                      <span style={{ fontSize: isEmoji ? 20 : 15, color: isEmoji ? undefined : 'white', fontWeight: 800 }}>{icon}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      {/* Freeze/Unfreeze */}
+                      <button title={frozen ? 'Unfreeze (restore to totals)' : 'Freeze (exclude from totals)'}
+                        onClick={() => handleFreeze(sub)}
+                        style={{ background: frozen ? '#DBEAFE' : 'none', border: `1.5px solid ${frozen ? '#93C5FD' : 'var(--sz-gray-200)'}`, borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                        onMouseEnter={e => { (e.currentTarget).style.background = '#DBEAFE'; }}
+                        onMouseLeave={e => { (e.currentTarget).style.background = frozen ? '#DBEAFE' : 'none'; }}>
+                        {frozen ? '🔥' : '❄️'}
+                      </button>
+                      {/* Vault dropdown */}
+                      {hasVault && (
+                        <div style={{ position: 'relative' }}>
+                          <button title="Manage subscription" onClick={() => setVaultOpen(v => !v)}
+                            style={{ background: 'none', border: '1.5px solid var(--sz-gray-200)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            🔗
+                          </button>
+                          {vaultOpen && (
+                            <div style={{ position: 'absolute', right: 0, top: 36, background: 'white', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', border: '1px solid var(--sz-gray-200)', zIndex: 100, minWidth: 160, overflow: 'hidden' }}>
+                              {meta.login_url && (
+                                <a href={meta.login_url} target="_blank" rel="noopener noreferrer"
+                                  style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: '#0A0A0A', textDecoration: 'none', fontWeight: 500 }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--sz-gray-100)'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}>
+                                  🔓 Open login ↗
+                                </a>
+                              )}
+                              {meta.cancel_url && (
+                                <a href={meta.cancel_url} target="_blank" rel="noopener noreferrer"
+                                  style={{ display: 'block', padding: '10px 14px', fontSize: 13, color: '#dc2626', textDecoration: 'none', fontWeight: 500 }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FEF2F2'; }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}>
+                                  ❌ Cancel on {sub.name} ↗
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {/* Edit */}
                       <button title="Edit" onClick={() => { setEditSub(sub); setShowModal(true); }}
-                        style={{ background: 'none', border: '1.5px solid var(--sz-gray-200)', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                        style={{ background: 'none', border: '1.5px solid var(--sz-gray-200)', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                         onMouseEnter={e => { (e.currentTarget).style.background = 'var(--sz-gray-100)'; }}
-                        onMouseLeave={e => { (e.currentTarget).style.background = 'none'; }}
-                      >✏️</button>
+                        onMouseLeave={e => { (e.currentTarget).style.background = 'none'; }}>✏️</button>
+                      {/* Delete */}
                       <button title="Remove" onClick={() => handleDelete(sub.id, sub.name)}
-                        style={{ background: 'none', border: '1.5px solid #FECACA', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
+                        style={{ background: 'none', border: '1.5px solid #FECACA', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}
                         onMouseEnter={e => { (e.currentTarget).style.background = '#FEF2F2'; }}
-                        onMouseLeave={e => { (e.currentTarget).style.background = 'none'; }}
-                      >🗑️</button>
+                        onMouseLeave={e => { (e.currentTarget).style.background = 'none'; }}>🗑️</button>
                     </div>
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, letterSpacing: -0.3 }}>{sub.name}</div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 12 }}>
-                    <span className={`sz-sub-badge ${badgeClass}`}>{badgeText}</span>
+
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3, letterSpacing: -0.3, filter: frozen ? 'grayscale(1)' : 'none' }}>{sub.name}</div>
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'center', marginBottom: 10 }}>
+                    <span className={`sz-sub-badge ${sub.usage_frequency === 'never' || sub.usage_frequency === 'rare' ? 'sz-badge-unused' : 'sz-badge-ok'}`}>
+                      {sub.usage_frequency === 'never' ? 'Unused' : sub.usage_frequency === 'rare' ? 'Rarely used' : 'Active'}
+                    </span>
                     <span style={{ fontSize: 11, color: 'var(--sz-gray-500)' }}>{sub.category}</span>
                   </div>
-                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 900, color: '#0A0A0A', marginBottom: 4 }}>
-                    {fmtCurrency(displayCost)}
+
+                  {/* Cost display */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 900, color: frozen ? 'var(--sz-gray-500)' : '#0A0A0A' }}>
+                      {fmtCurrency(displayCost)}
+                    </div>
+                    {priceChange && !frozen && (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', background: '#FEF2F2', padding: '1px 6px', borderRadius: 6 }}>
+                        ↑ +₹{Math.round(priceChange.new_cost - priceChange.old_cost)}
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>
-                    {isYearly ? '/year' : `/${sub.billing_cycle}`} · Renews {renewalDate}
+                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)', marginBottom: 6 }}>
+                    {frozen ? 'Frozen — not counting' : isYearly ? '/year' : `/${sub.billing_cycle}`}
+                    {isSplit && !frozen && ` · Your ${sharePct}% share`}
                   </div>
-                  {days <= 7 && days >= 0 && (
-                    <div style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 5, background: days <= 3 ? '#FEF2F2' : '#FFF7ED', color: days <= 3 ? '#dc2626' : '#ea580c', borderRadius: 100, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>
+
+                  {/* Renewal badge */}
+                  {!frozen && days <= 7 && days >= 0 && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: days <= 3 ? '#FEF2F2' : '#FFF7ED', color: days <= 3 ? '#dc2626' : '#ea580c', borderRadius: 100, padding: '3px 10px', fontSize: 10, fontWeight: 700, marginTop: 4 }}>
                       ⚡ Renews in {days} day{days !== 1 ? 's' : ''}
                     </div>
                   )}
-                  <div style={{ marginTop: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: sub.usage_frequency === 'daily' || sub.usage_frequency === 'weekly' ? '#16a34a' : sub.usage_frequency === 'monthly' ? '#f59e0b' : '#dc2626' }} />
-                    <span style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Used {sub.usage_frequency}</span>
-                  </div>
+
+                  {/* Split indicator */}
+                  {isSplit && !frozen && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      👥 Split · Full cost: {fmtCurrency(isYearly ? fullMonthly * 12 : fullMonthly)}
+                    </div>
+                  )}
+
+                  {/* Frozen since */}
+                  {frozen && meta.frozen_at && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#93C5FD' }}>
+                      ❄️ Frozen since {new Date(meta.frozen_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  )}
+
+                  {/* Price history trail */}
+                  {meta.price_history && meta.price_history.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: 'var(--sz-gray-500)' }}>
+                      📈 {meta.price_history.map((h, i) => (
+                        <span key={i}>{i > 0 && ' → '}₹{Math.round(h.old_cost)}</span>
+                      ))} → ₹{Math.round(sub.cost)}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -406,7 +738,6 @@ export default function SubscriptionsPage() {
           editData={editSub}
         />
       )}
-
       {confirmDelete && (
         <ConfirmModal
           name={confirmDelete.name}

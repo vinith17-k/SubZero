@@ -869,3 +869,139 @@ body::before {
   .sz-final-cta-section { padding-bottom: 100px; }
 }
 
+/* ──────────────────────────────────────────────────────────────── */
+/* FEATURE CSS: Freeze Mode, Trial, Vault, Split, Simulator, Overlap */
+/* ──────────────────────────────────────────────────────────────── */
+
+/* ── FROZEN CARD (desaturated, frost border) ── */
+.sz-frozen-card {
+  filter: grayscale(0.65) brightness(0.97) !important;
+  border: 1.5px solid #93C5FD !important;
+  background: linear-gradient(135deg, #F8FAFF, #EFF6FF) !important;
+  position: relative;
+}
+.sz-frozen-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(147, 197, 253, 0.08), rgba(219, 234, 254, 0.12));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── TOGGLE SWITCH ── */
+.sz-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: none;
+  border-radius: 100px;
+  background: var(--sz-gray-300);
+  cursor: pointer;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+  outline: none;
+}
+.sz-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  transition: transform 0.25s ease;
+}
+.sz-toggle.sz-on {
+  background: #0A0A0A;
+}
+.sz-toggle.sz-on::after {
+  transform: translateX(20px);
+}
+
+/* ── PULSE ANIMATION (for simulator mode indicator) ── */
+@keyframes sz-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ── GRAY-50 utility ── */
+.sz-gray-50 { color: #FAFAF9; }
+
+/* ── SIMULATOR hover row ── */
+.sz-sim-row:hover { background: var(--sz-gray-50); }
+
+/* ── CATEGORY CHIP (for subscription modal grid) ── */
+.sz-category-chip {
+  padding: 7px 10px;
+  border: 1.5px solid var(--sz-gray-200);
+  border-radius: 10px;
+  background: white;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  text-align: center;
+  color: var(--sz-gray-700);
+}
+.sz-category-chip:hover { border-color: #0A0A0A; }
+.sz-category-chip.sz-selected {
+  border-color: #0A0A0A;
+  background: #0A0A0A;
+  color: white;
+}
+
+/* ── VAULT DROPDOWN ── */
+.sz-vault-dropdown {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  border: 1px solid var(--sz-gray-200);
+  z-index: 100;
+  min-width: 160px;
+  overflow: hidden;
+}
+.sz-vault-link {
+  display: block;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #0A0A0A;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.sz-vault-link:hover { background: var(--sz-gray-100); }
+.sz-vault-link.sz-danger { color: #dc2626; }
+.sz-vault-link.sz-danger:hover { background: #FEF2F2; }
+
+/* ── OVERLAP COMPARE GRID ── */
+.sz-compare-grid {
+  margin-top: 16px;
+  background: #F0F9FF;
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+/* ── TRIAL BANNER (urgency) ── */
+.sz-trial-banner {
+  background: linear-gradient(90deg, #FFF7ED, #FFFBEB);
+  border: 1.5px solid #F59E0B;
+  border-radius: 16px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+

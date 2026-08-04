@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { fmtCurrency, daysUntil, renewalUrgencyColor } from '@/lib/format';
+import { isTrial, trialDaysLeft } from '@/lib/subscriptionMeta';
 
 const CATEGORY_COLORS: Record<string, string> = {
   Entertainment: '#E8541A', Productivity: '#0078D4', Music: '#1DB954',
@@ -17,9 +18,15 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: subscriptions = [], getMonthly, totalMonthly, deleteSubscription } = useSubscriptions();
-  const { data: insights = [], dismissInsight, totalSavings } = useInsights(subscriptions);
+  const {
+    data: allSubs = [], activeSubs, frozenSubs, urgentTrials,
+    getMonthly, totalMonthly, deleteSubscription
+  } = useSubscriptions();
+  const { data: insights = [], totalSavings } = useInsights(allSubs);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Use allSubs for display, activeSubs for charts/totals (excludes frozen)
+  const subscriptions = allSubs;
 
   const name = (user?.user_metadata?.full_name as string) || user?.email || 'there';
   const firstName = name.split(' ')[0];
@@ -28,14 +35,14 @@ export default function Dashboard() {
   const now = new Date();
   const monthYear = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  // Upcoming renewals (next 30 days)
-  const upcoming = [...subscriptions]
+  // Upcoming renewals (next 30 days) — exclude frozen
+  const upcoming = [...activeSubs]
     .filter(s => s.next_renewal_date && daysUntil(s.next_renewal_date) <= 30 && daysUntil(s.next_renewal_date) >= 0)
     .sort((a, b) => daysUntil(a.next_renewal_date) - daysUntil(b.next_renewal_date))
     .slice(0, 4);
 
-  // Category breakdown for chart
-  const byCategory = subscriptions.reduce<Record<string, number>>((acc, s) => {
+  // Category breakdown for chart — active subs only (not frozen)
+  const byCategory = activeSubs.reduce<Record<string, number>>((acc, s) => {
     const cat = s.category || 'Other';
     acc[cat] = (acc[cat] || 0) + getMonthly(s);
     return acc;
@@ -45,8 +52,8 @@ export default function Dashboard() {
     .slice(0, 6)
     .map(([name, value]) => ({ name, value: Math.round(value) }));
 
-  // Cancel candidates
-  const candidates = subscriptions
+  // Cancel candidates — active subs only
+  const candidates = activeSubs
     .filter(s => s.usage_frequency === 'never' || s.usage_frequency === 'rare')
     .slice(0, 3);
 
@@ -73,10 +80,20 @@ export default function Dashboard() {
             <div className="sz-page-heading sz-fade-in sz-fade-in-1">{greeting}, {firstName} ✦</div>
             <div className="sz-page-sub sz-fade-in sz-fade-in-2">Here's your subscription overview for {monthYear}</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {subscriptions.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {activeSubs.length > 0 && (
               <div style={{ fontSize: 13, color: 'var(--sz-gray-500)', background: 'var(--sz-gray-100)', padding: '6px 14px', borderRadius: 100 }}>
-                {subscriptions.length} active
+                {activeSubs.length} active
+              </div>
+            )}
+            {frozenSubs.length > 0 && (
+              <div style={{ fontSize: 13, color: '#1d4ed8', background: '#DBEAFE', padding: '6px 14px', borderRadius: 100, fontWeight: 600 }}>
+                ❄️ {frozenSubs.length} frozen
+              </div>
+            )}
+            {urgentTrials.length > 0 && (
+              <div style={{ fontSize: 13, color: '#b45309', background: '#FEF9C3', padding: '6px 14px', borderRadius: 100, fontWeight: 600 }}>
+                ⏳ {urgentTrials.length} trial ending
               </div>
             )}
             <div className="sz-avatar sz-fade-in sz-fade-in-1" onClick={() => navigate('/settings')}>
@@ -85,13 +102,27 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Trial urgency banner */}
+        {urgentTrials.length > 0 && (
+          <div style={{ background: 'linear-gradient(90deg, #FFF7ED, #FFFBEB)', border: '1.5px solid #F59E0B', borderRadius: 16, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} className="sz-fade-in sz-fade-in-1">
+            <span style={{ fontSize: 20 }}>⏳</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Trial ending soon!</div>
+              <div style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>
+                {urgentTrials.map(s => s.name).join(', ')} will start charging within 3 days. Check AI Insights.
+              </div>
+            </div>
+            <button className="sz-btn-primary" style={{ fontSize: 13, padding: '8px 16px', background: '#92400E' }} onClick={() => navigate('/insights')}>View Alerts →</button>
+          </div>
+        )}
+
         {/* Stats grid */}
         <div className="sz-stats-grid">
           <div className="sz-stat-card sz-fade-in sz-fade-in-1">
             <div className="sz-stat-label">Monthly Spend</div>
             <div className="sz-stat-value">{fmtCurrency(totalMonthly)}</div>
             <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>
-              {subscriptions.length} active subscription{subscriptions.length !== 1 ? 's' : ''}
+              {activeSubs.length} active subscription{activeSubs.length !== 1 ? 's' : ''}
             </div>
           </div>
           <div className="sz-stat-card sz-fade-in sz-fade-in-2">
