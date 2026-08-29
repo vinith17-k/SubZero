@@ -14,6 +14,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
 import { Analytics } from "@vercel/analytics/react";
 import NotFound from "./pages/NotFound";
+import { Analytics } from "@vercel/analytics/react";
 
 
 const queryClient = new QueryClient({
