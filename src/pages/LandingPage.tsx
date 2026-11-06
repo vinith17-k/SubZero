@@ -1,12 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { enterDemoMode } = useAuth();
   const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const handleDemo = () => {
+    enterDemoMode();
+    navigate('/dashboard');
+  };
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
@@ -59,7 +66,7 @@ export default function LandingPage() {
               <InteractiveHoverButton onClick={() => navigate('/auth')}>
                 Start for Free
               </InteractiveHoverButton>
-              <button className="sz-btn-secondary" onClick={() => navigate('/auth')}>Try Demo</button>
+              <button className="sz-btn-secondary" onClick={handleDemo}>Try Demo</button>
             </div>
             <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'flex', gap: 28, flexWrap: 'wrap' }}>
               <div>

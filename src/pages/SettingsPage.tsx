@@ -110,9 +110,13 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
+      if (isDemoMode) {
+        toast.success('Profile updated (demo session)');
+        return;
+      }
       await supabase.auth.updateUser({ data: { full_name: profile.full_name } });
       await supabase.from('users').update({ full_name: profile.full_name, currency: profile.currency }).eq('user_id', user!.id);
-      toast.success('Profile updated ✓');
+      toast.success('Profile updated');
     } catch {
       toast.error('Failed to update profile');
     } finally {
@@ -124,7 +128,7 @@ export default function SettingsPage() {
     setSavingNotifs(true);
     try {
       await updateSettings.mutateAsync(notifs);
-      toast.success('Settings saved ✓');
+      toast.success('Settings saved');
     } catch {
       toast.error('Failed to save settings');
     } finally {
@@ -160,6 +164,7 @@ export default function SettingsPage() {
       if (isDemoMode) {
         localStorage.removeItem('sz_offline_subscriptions');
         localStorage.removeItem('sz_offline_settings');
+        localStorage.removeItem('sz_demo_mode');
         await signOut();
         window.location.href = '/';
         return;

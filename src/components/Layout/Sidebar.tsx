@@ -48,7 +48,7 @@ interface SidebarProps {
 export default function Sidebar({ insightCount = 0 }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, isDemoMode } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   const name = (user?.user_metadata?.full_name as string) || user?.email || 'User';
@@ -66,50 +66,24 @@ export default function Sidebar({ insightCount = 0 }: SidebarProps) {
 
   return (
     <div className={`sz-sidebar ${collapsed ? 'sz-collapsed' : ''}`}>
-      {/* Top Header: Logo + Collapse Toggle */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          padding: '0 4px 20px',
-        }}
-      >
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-          onClick={() => navigate('/')}
-          title="SubZero"
-        >
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', padding: '0 4px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onClick={() => navigate('/')} title="SubZero">
           <div style={{ width: 32, height: 32, background: '#0A0A0A', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <svg viewBox="0 0 16 16" style={{ width: 16, height: 16, fill: 'white' }}>
               <path d="M8 2L14 5.5V10.5L8 14L2 10.5V5.5L8 2Z" />
             </svg>
           </div>
           {!collapsed && (
-            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 900, color: '#0A0A0A' }}>
-              SubZero
-            </span>
+            <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 19, fontWeight: 900, color: '#0A0A0A' }}>SubZero</span>
           )}
         </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <AnimatedThemeToggler variant="circle" />
           <button
             onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            style={{
-              background: 'rgba(0,0,0,0.04)',
-              border: 'none',
-              borderRadius: 8,
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--sz-gray-700)',
-              transition: 'all 0.2s',
-            }}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: 8, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--sz-gray-700)', transition: 'all 0.2s' }}
           >
             <svg viewBox="0 0 16 16" fill="currentColor" style={{ width: 14, height: 14, transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
               <path d="M10.22 3.22a.75.75 0 0 1 1.06 1.06L7.56 8l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25Z" />
@@ -117,6 +91,23 @@ export default function Sidebar({ insightCount = 0 }: SidebarProps) {
           </button>
         </div>
       </div>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && !collapsed && (
+        <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12 }}>
+          <div style={{ fontWeight: 700, color: '#92400E', marginBottom: 3 }}>Demo Mode</div>
+          <div style={{ color: '#B45309', lineHeight: 1.4, marginBottom: 8 }}>Data is not saved. Create an account to keep your subs.</div>
+          <button
+            onClick={() => navigate('/auth')}
+            style={{ background: '#0A0A0A', color: 'white', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', width: '100%', fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Create Free Account
+          </button>
+        </div>
+      )}
+      {isDemoMode && collapsed && (
+        <div title="Demo Mode — data not saved" style={{ width: 8, height: 8, background: '#F59E0B', borderRadius: '50%', margin: '0 auto 12px' }} />
+      )}
 
       {/* Nav Sections */}
       {navSections.map(sec => {
@@ -148,7 +139,6 @@ export default function Sidebar({ insightCount = 0 }: SidebarProps) {
         );
       })}
 
-      {/* Spacer */}
       <div style={{ flex: 1 }} />
 
       {/* User + Sign Out */}
@@ -157,27 +147,26 @@ export default function Sidebar({ insightCount = 0 }: SidebarProps) {
           <div className="sz-avatar" style={{ width: 32, height: 32, fontSize: 12 }} title={name}>{initials}</div>
           {!collapsed && (
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-              <div style={{ fontSize: 11, color: 'var(--sz-gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isDemoMode ? 'Demo User' : name}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--sz-gray-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {isDemoMode ? 'demo@subzero.app' : user?.email}
+              </div>
             </div>
           )}
         </div>
         <button
           onClick={handleSignOut}
           title="Sign Out"
-          style={{
-            width: '100%', background: 'none', border: '1.5px solid #FECACA', borderRadius: 10,
-            padding: collapsed ? '8px 0' : '8px 12px', fontSize: 13, fontWeight: 600, color: '#dc2626',
-            cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
-          }}
+          style={{ width: '100%', background: 'none', border: '1.5px solid #FECACA', borderRadius: 10, padding: collapsed ? '8px 0' : '8px 12px', fontSize: 13, fontWeight: 600, color: '#dc2626', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#FEF2F2'; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
         >
           <svg viewBox="0 0 16 16" fill="currentColor" style={{ width: 14, height: 14 }}>
-            <path fillRule="evenodd" d="M3 3.5A1.5 1.5 0 0 1 4.5 2h4a.75.75 0 0 1 0 1.5h-4a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h4a.75.75 0 0 1 0 1.5h-4A1.5 1.5 0 0 1 3 12.5v-9wZM10.22 8.53a.75.75 0 0 0 0-1.06L8.22 5.47a.75.75 0 0 0-1.06 1.06l.72.72H5.75a.75.75 0 0 0 0 1.5h2.19l-.72.72a.75.75 0 1 0 1.06 1.06l2-2Z" />
+            <path fillRule="evenodd" d="M3 3.5A1.5 1.5 0 0 1 4.5 2h4a.75.75 0 0 1 0 1.5h-4a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h4a.75.75 0 0 1 0 1.5h-4A1.5 1.5 0 0 1 3 12.5v-9Zm7.78 2.03a.75.75 0 0 0-1.06 1.06L11.44 8l-1.72 1.72a.75.75 0 1 0 1.06 1.06l2-2a.75.75 0 0 0 0-1.06l-2-2Z" />
           </svg>
-          {!collapsed && <span>Sign Out</span>}
+          {!collapsed && <span>{isDemoMode ? 'Exit Demo' : 'Sign Out'}</span>}
         </button>
       </div>
     </div>

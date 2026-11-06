@@ -207,8 +207,8 @@ export function useInsights(subscriptions?: Subscription[]) {
 
   const dismissInsight = useMutation({
     mutationFn: async (id: string) => {
-      // Local-only insights (overlap/trial/price_hike) have prefixed IDs
-      if (id.startsWith('overlap-') || id.startsWith('trial-') || id.startsWith('price-hike-')) {
+      // Local/demo-only insights have prefixed IDs or demo mode is active
+      if (isDemoMode || id.startsWith('overlap-') || id.startsWith('trial-') || id.startsWith('price-hike-') || id.startsWith('local-') || id.startsWith('ins-')) {
         // Nothing to dismiss in DB — handled via local state in the page
         return;
       }
@@ -218,7 +218,9 @@ export function useInsights(subscriptions?: Subscription[]) {
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['insights'] }),
+    onSuccess: () => {
+      if (!isDemoMode) qc.invalidateQueries({ queryKey: ['insights'] });
+    },
   });
 
   // Combine DB insights with client-generated ones

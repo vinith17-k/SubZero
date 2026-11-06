@@ -1,4 +1,3 @@
-import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -13,17 +12,20 @@ export type Subscription = Tables<'subscriptions'>;
 export type SubscriptionInsert = TablesInsert<'subscriptions'>;
 export type SubscriptionUpdate = TablesUpdate<'subscriptions'>;
 
+const DEMO_CACHE_KEY = ['subscriptions', 'demo-user-local'];
+
 export function useSubscriptions() {
   const { user, isDemoMode } = useAuth();
   const qc = useQueryClient();
 
-  // Local state for demo mutations
-  const [demoSubs, setDemoSubs] = useState<Subscription[]>(MOCK_SUBSCRIPTIONS);
-
   const query = useQuery({
     queryKey: ['subscriptions', user?.id],
     queryFn: async () => {
-      if (isDemoMode) return demoSubs;
+      if (isDemoMode) {
+        // Return current cache or seed with mock data
+        const cached = qc.getQueryData<Subscription[]>(DEMO_CACHE_KEY);
+        return cached ?? MOCK_SUBSCRIPTIONS;
+      }
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -34,9 +36,15 @@ export function useSubscriptions() {
       return data as Subscription[];
     },
     enabled: !!user,
-    // In demo mode, seed with our local state
-    initialData: isDemoMode ? demoSubs : undefined,
   });
+
+  // Helper: update demo cache directly in React Query
+  const updateDemoCache = (updater: (prev: Subscription[]) => Subscription[]) => {
+    const prev = qc.getQueryData<Subscription[]>(DEMO_CACHE_KEY) ?? MOCK_SUBSCRIPTIONS;
+    const next = updater(prev);
+    qc.setQueryData(DEMO_CACHE_KEY, next);
+    qc.setQueryData(['subscriptions', user?.id], next);
+  };
 
   const addSubscription = useMutation({
     mutationFn: async (sub: Omit<SubscriptionInsert, 'user_id'>) => {
@@ -55,25 +63,25 @@ export function useSubscriptions() {
           category: sub.category ?? null,
           usage_frequency: sub.usage_frequency ?? null,
         };
-        setDemoSubs(prev => [newSub, ...prev]);
+        updateDemoCache(prev => [newSub, ...prev]);
         return;
       }
       const { error } = await supabase.from('subscriptions').insert({ ...sub, user_id: user!.id });
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
   const updateSubscription = useMutation({
     mutationFn: async ({ id, ...updates }: SubscriptionUpdate & { id: string }) => {
       if (isDemoMode) {
-        setDemoSubs(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+        updateDemoCache(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
         return;
       }
       const { error } = await supabase.from('subscriptions').update(updates).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
   const updateCost = useMutation({
@@ -82,54 +90,54 @@ export function useSubscriptions() {
     }) => {
       const meta = recordPriceChange(currentNotes, oldCost, newCost);
       if (isDemoMode) {
-        setDemoSubs(prev => prev.map(s => s.id === id ? { ...s, cost: newCost, notes: stringifyMeta(meta) } : s));
+        updateDemoCache(prev => prev.map(s => s.id === id ? { ...s, cost: newCost, notes: stringifyMeta(meta) } : s));
         return;
       }
       const { error } = await supabase.from('subscriptions').update({ cost: newCost, notes: stringifyMeta(meta) }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
   const deleteSubscription = useMutation({
     mutationFn: async (id: string) => {
       if (isDemoMode) {
-        setDemoSubs(prev => prev.map(s => s.id === id ? { ...s, is_active: false } : s));
+        updateDemoCache(prev => prev.map(s => s.id === id ? { ...s, is_active: false } : s));
         return;
       }
       const { error } = await supabase.from('subscriptions').update({ is_active: false }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
   const freezeSubscription = useMutation({
     mutationFn: async ({ id, currentNotes }: { id: string; currentNotes: string | null }) => {
       const meta = { ...parseMeta(currentNotes), is_frozen: true, frozen_at: new Date().toISOString() };
       if (isDemoMode) {
-        setDemoSubs(prev => prev.map(s => s.id === id ? { ...s, notes: stringifyMeta(meta) } : s));
+        updateDemoCache(prev => prev.map(s => s.id === id ? { ...s, notes: stringifyMeta(meta) } : s));
         return;
       }
       const { error } = await supabase.from('subscriptions').update({ notes: stringifyMeta(meta) }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
   const unfreezeSubscription = useMutation({
     mutationFn: async ({ id, currentNotes }: { id: string; currentNotes: string | null }) => {
       const meta = { ...parseMeta(currentNotes), is_frozen: false, frozen_at: undefined };
       if (isDemoMode) {
-        setDemoSubs(prev => prev.map(s => s.id === id ? { ...s, notes: stringifyMeta(meta) } : s));
+        updateDemoCache(prev => prev.map(s => s.id === id ? { ...s, notes: stringifyMeta(meta) } : s));
         return;
       }
       const { error } = await supabase.from('subscriptions').update({ notes: stringifyMeta(meta) }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['subscriptions'] }),
+    onSuccess: () => { if (!isDemoMode) qc.invalidateQueries({ queryKey: ['subscriptions'] }); },
   });
 
-  const all = (isDemoMode ? demoSubs : query.data) ?? [];
+  const all = query.data ?? [];
   const activeSubs = all.filter(s => s.is_active && !isFrozen(s.notes));
   const frozenSubs = all.filter(s => s.is_active && isFrozen(s.notes));
   const trialSubs = all.filter(s => isTrial(s.notes));

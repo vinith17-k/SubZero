@@ -22,17 +22,21 @@ const USAGE_FREQS: UsageFrequency[] = ['daily', 'weekly', 'monthly', 'rare', 'ne
 const COLOR_PRESETS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#E50914', '#1DB954', '#FF0000', '#0078D4', '#181717', '#F24E1E'];
 
 const QUICK_SERVICES = [
-  { name: 'Netflix', icon_emoji: '🎬', icon_color: '#E50914', category: 'Entertainment' as Category, cost: 649, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'Spotify', icon_emoji: '🎵', icon_color: '#1DB954', category: 'Music' as Category, cost: 119, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'YouTube Premium', icon_emoji: '▶️', icon_color: '#FF0000', category: 'Entertainment' as Category, cost: 189, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'Amazon Prime', icon_emoji: '📦', icon_color: '#FF9900', category: 'Entertainment' as Category, cost: 299, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'Notion', icon_emoji: '📝', icon_color: '#000000', category: 'Productivity' as Category, cost: 800, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'Adobe CC', icon_emoji: '🎨', icon_color: '#FF0000', category: 'Design' as Category, cost: 1675, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'Figma', icon_emoji: '✏️', icon_color: '#F24E1E', category: 'Design' as Category, cost: 1200, billing_cycle: 'monthly' as BillingCycle },
-  { name: 'GitHub', icon_emoji: '🐙', icon_color: '#181717', category: 'Productivity' as Category, cost: 333, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Netflix', icon_emoji: 'N', icon_color: '#E50914', category: 'Entertainment' as Category, cost: 649, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Spotify', icon_emoji: '♪', icon_color: '#1DB954', category: 'Music' as Category, cost: 119, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Hotstar', icon_emoji: 'H', icon_color: '#1F80E0', category: 'Entertainment' as Category, cost: 299, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'JioCinema', icon_emoji: 'J', icon_color: '#D80064', category: 'Entertainment' as Category, cost: 29, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'YouTube Premium', icon_emoji: 'Y', icon_color: '#FF0000', category: 'Entertainment' as Category, cost: 189, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Amazon Prime', icon_emoji: 'P', icon_color: '#FF9900', category: 'Entertainment' as Category, cost: 299, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'ChatGPT Plus', icon_emoji: 'G', icon_color: '#10A37F', category: 'Productivity' as Category, cost: 1999, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Google One', icon_emoji: 'G', icon_color: '#4285F4', category: 'Cloud' as Category, cost: 130, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Notion', icon_emoji: 'N', icon_color: '#000000', category: 'Productivity' as Category, cost: 800, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Adobe CC', icon_emoji: 'A', icon_color: '#FF0000', category: 'Design' as Category, cost: 1675, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'Figma', icon_emoji: 'F', icon_color: '#F24E1E', category: 'Design' as Category, cost: 1200, billing_cycle: 'monthly' as BillingCycle },
+  { name: 'GitHub', icon_emoji: 'G', icon_color: '#181717', category: 'Productivity' as Category, cost: 333, billing_cycle: 'monthly' as BillingCycle },
 ];
 
-type SortOption = 'cost-desc' | 'cost-asc' | 'name' | 'renewal';
+type SortOption = 'worst-value' | 'cost-desc' | 'cost-asc' | 'name' | 'renewal';
 type TabFilter = 'All' | Category | 'Frozen' | 'Trials';
 
 // ── Confirm Delete Modal ──────────────────────────────────────────────────────
@@ -588,7 +592,7 @@ export default function SubscriptionsPage() {
   const [editSub, setEditSub] = useState<Subscription | undefined>();
   const [isYearly, setIsYearly] = useState(false);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortOption>('cost-desc');
+  const [sort, setSort] = useState<SortOption>('worst-value');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   const displaySubs = tab === 'Frozen' ? frozenSubs
@@ -603,6 +607,13 @@ export default function SubscriptionsPage() {
       subs = subs.filter(s => s.name.toLowerCase().includes(q) || (s.category || '').toLowerCase().includes(q));
     }
     return [...subs].sort((a, b) => {
+      if (sort === 'worst-value') {
+        const usageRank: Record<string, number> = { never: 0, rare: 1, monthly: 2, weekly: 3, daily: 4 };
+        const rankA = usageRank[a.usage_frequency || 'monthly'] ?? 2;
+        const rankB = usageRank[b.usage_frequency || 'monthly'] ?? 2;
+        if (rankA !== rankB) return rankA - rankB;
+        return getFullMonthly(b) - getFullMonthly(a);
+      }
       if (sort === 'cost-desc') return getFullMonthly(b) - getFullMonthly(a);
       if (sort === 'cost-asc') return getFullMonthly(a) - getFullMonthly(b);
       if (sort === 'name') return a.name.localeCompare(b.name);
@@ -617,7 +628,7 @@ export default function SubscriptionsPage() {
     if (!confirmDelete) return;
     try {
       await deleteSubscription.mutateAsync(confirmDelete.id);
-      toast.success(`${confirmDelete.name} removed ✓`);
+      toast.success(`${confirmDelete.name} removed`);
     } catch { toast.error('Failed to remove'); }
     finally { setConfirmDelete(null); }
   };
@@ -627,10 +638,10 @@ export default function SubscriptionsPage() {
     try {
       if (frozen) {
         await unfreezeSubscription.mutateAsync({ id: sub.id, currentNotes: sub.notes });
-        toast.success(`${sub.name} unfrozen — counting in totals again ✓`);
+        toast.success(`${sub.name} unfrozen`);
       } else {
         await freezeSubscription.mutateAsync({ id: sub.id, currentNotes: sub.notes });
-        toast.success(`${sub.name} frozen ❄️ — excluded from spend totals`);
+        toast.success(`${sub.name} paused (frozen)`);
       }
     } catch { toast.error('Failed to update subscription'); }
   };
@@ -683,6 +694,7 @@ export default function SubscriptionsPage() {
           </div>
           <select value={sort} onChange={e => setSort(e.target.value as SortOption)}
             style={{ border: '1.5px solid var(--sz-gray-200)', borderRadius: 100, padding: '8px 16px', fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, outline: 'none', background: 'white', cursor: 'pointer' }}>
+            <option value="worst-value">Worst value first (Pay vs Use)</option>
             <option value="cost-desc">Highest cost first</option>
             <option value="cost-asc">Lowest cost first</option>
             <option value="name">Name A–Z</option>
