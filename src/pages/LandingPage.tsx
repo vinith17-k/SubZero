@@ -50,7 +50,7 @@ export default function LandingPage() {
         </ul>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <AnimatedThemeToggler variant="circle" />
-          <button className="sz-nav-cta" onClick={() => navigate('/auth')}>Get Started Free</button>
+          <button className="sz-nav-cta" onClick={() => navigate('/auth')}>Open SubZero</button>
         </div>
       </nav>
 
@@ -58,41 +58,31 @@ export default function LandingPage() {
         {/* HERO */}
         <div className="sz-hero">
           <div>
-            <div className="sz-hero-badge sz-fade-in sz-fade-in-1">Subscription Intelligence ✦</div>
+            <div className="sz-hero-badge sz-fade-in sz-fade-in-1">Subscription operations</div>
             <h1 className="sz-hero-title sz-fade-in sz-fade-in-2">
-              Track What<br />You Pay <em>vs</em><br />What You Use
+              Know every charge.<br />Keep every decision.
             </h1>
             <p className="sz-hero-sub sz-fade-in sz-fade-in-3">
-              Most people unknowingly waste thousands per year on forgotten, overlapping, or underused subscriptions. SubZero gives you total clarity.
+              Put renewals, recurring costs, and actual usage in one workspace built for quick decisions.
             </p>
             <div className="sz-hero-ctas sz-fade-in sz-fade-in-4" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <InteractiveHoverButton onClick={() => navigate('/auth')}>
                 Start for Free
               </InteractiveHoverButton>
-              <button className="sz-btn-secondary" onClick={() => navigate('/auth')}>See Demo ↗</button>
+              <button className="sz-btn-secondary" onClick={() => navigate('/auth')}>Use offline</button>
             </div>
-            <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+            <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, maxWidth: 390 }}>
               <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
-                  <NumberTicker value={12} />
-                  <span>k+</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Active users</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>Renewals</div>
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Calendar view</div>
               </div>
               <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
-                  <span>₹</span>
-                  <NumberTicker value={2.4} decimalPlaces={1} />
-                  <span>Cr</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Saved</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>Usage</div>
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Frequency data</div>
               </div>
               <div>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
-                  <NumberTicker value={4.9} decimalPlaces={1} />
-                  <span>★</span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Rating</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>Actions</div>
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Keep or cancel</div>
               </div>
             </div>
           </div>
@@ -133,7 +123,7 @@ export default function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="sz-float-card sz-float-card-2">💰 Save ₹1,890/mo</div>
+            <div className="sz-float-card sz-float-card-2">₹1,890 potential savings</div>
           </div>
         </div>
 
@@ -141,12 +131,11 @@ export default function LandingPage() {
         <div className="sz-mobile-hero-stat sz-fade-in sz-fade-in-4">
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[
-              { emoji: '💸', label: 'Avg wasted/mo', val: '₹3,200' },
-              { emoji: '📱', label: 'Avg subscriptions', val: '11' },
-              { emoji: '🤖', label: 'AI insights', val: 'Free' },
+              { emoji: '', label: 'Renewal control', val: 'Calendar' },
+              { emoji: '', label: 'Local workspace', val: 'Offline' },
+              { emoji: '', label: 'Saved records', val: 'Browser' },
             ].map((s, i) => (
               <div key={i} style={{ background: 'white', borderRadius: 16, padding: '16px 20px', textAlign: 'center', boxShadow: 'var(--sz-card-shadow)', minWidth: 100 }}>
-                <div style={{ fontSize: 24, marginBottom: 4 }}>{s.emoji}</div>
                 <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 900 }}>{s.val}</div>
                 <div style={{ fontSize: 11, color: 'var(--sz-gray-500)', marginTop: 2 }}>{s.label}</div>
               </div>
@@ -285,12 +274,12 @@ export default function LandingPage() {
             </div>
             <div className="sz-features-grid">
               {[
-                { icon: '📅', title: 'Renewal Calendar', desc: 'Visual calendar showing all upcoming renewals. Never get surprised by a charge again.' },
-                { icon: '🤖', title: 'AI Insights', desc: 'Machine learning models analyze your patterns and surface actionable savings opportunities.' },
-                { icon: '📊', title: 'Spend Analytics', desc: 'Beautiful charts showing where your money goes across categories and time periods.' },
-                { icon: '🔔', title: 'Smart Alerts', desc: 'Customizable notifications for renewals, price changes, and cancellation opportunities.' },
-                { icon: '🔗', title: 'Overlap Detection', desc: 'Automatically finds duplicate or overlapping services in your subscription stack.' },
-                { icon: '📱', title: 'Multi-device Sync', desc: 'Access your subscription data from any device, any time, in real-time.' },
+                { icon: '01', title: 'Renewal Calendar', desc: 'Review every upcoming charge in one chronological view.' },
+                { icon: '02', title: 'Usage Insights', desc: 'Compare recurring cost with actual frequency and recent activity.' },
+                { icon: '03', title: 'Spend Analytics', desc: 'See category and billing-cycle changes without a spreadsheet.' },
+                { icon: '04', title: 'Smart Alerts', desc: 'Bring renewal and price changes to the top of your attention list.' },
+                { icon: '05', title: 'Overlap Detection', desc: 'Identify services serving the same workflow before renewal.' },
+                { icon: '06', title: 'Offline Workspace', desc: 'Keep working when Supabase or the internet is unavailable.' },
               ].map((f, i) => (
                 <div key={i} className="sz-feature-card">
                   <div className="sz-feature-icon">{f.icon}</div>
@@ -312,7 +301,6 @@ export default function LandingPage() {
           <div style={{ maxWidth: 480, margin: '0 auto' }}>
             <div className="sz-card" style={{ padding: 40, textAlign: 'center', border: '2px solid var(--sz-black)', position: 'relative', overflow: 'visible' }}>
               <div style={{ position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)', background: 'var(--sz-accent)', color: 'white', fontSize: 12, fontWeight: 700, padding: '4px 16px', borderRadius: 100, whiteSpace: 'nowrap' }}>
-                ✦ Most Popular
               </div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 48, fontWeight: 900, color: '#0A0A0A', lineHeight: 1 }}>₹0</div>
               <div style={{ fontSize: 15, color: 'var(--sz-gray-500)', marginTop: 4, marginBottom: 32 }}>per month, forever</div>
@@ -343,42 +331,26 @@ export default function LandingPage() {
         {/* FINAL CTA */}
         <div className="sz-final-cta-section sz-reveal">
           <div className="sz-final-cta-card">
-            <h2 className="sz-final-cta-title">Start <em>Saving</em><br />Money Now</h2>
-            <p className="sz-final-cta-sub">Join thousands of users who've already taken control of their subscriptions. Setup takes under 3 minutes.</p>
+            <h2 className="sz-final-cta-title">Your subscriptions,<br />under control.</h2>
+            <p className="sz-final-cta-sub">Open your workspace, review the next renewal, and decide what stays.</p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1, alignItems: 'center' }}>
               <InteractiveHoverButton
                 onClick={() => navigate('/auth')}
                 className="bg-white text-black border-transparent hover:border-white/50 text-base py-3 px-8"
               >
-                Get Started Free
+                Open the workspace
               </InteractiveHoverButton>
               <button style={{ background: 'transparent', color: 'white', border: '1.5px solid rgba(255,255,255,0.2)', padding: '16px 28px', borderRadius: 100, fontSize: 15, fontWeight: 500, cursor: 'default', fontFamily: "'DM Sans', sans-serif" }}>
                 No credit card needed
               </button>
             </div>
             <div style={{ marginTop: 48, display: 'flex', gap: 48, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
-                  <NumberTicker value={12} className="text-white dark:text-white" />
-                  <span>k+</span>
+              {['Inventory', 'Renewals', 'Decisions'].map((step, index) => (
+                <div key={step} style={{ textAlign: 'center' }}>
+                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white' }}>0{index + 1}</div>
+                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{step}</div>
                 </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Active users</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
-                  <span>₹</span>
-                  <NumberTicker value={2.4} decimalPlaces={1} className="text-white dark:text-white" />
-                  <span>Cr</span>
-                </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Saved this year</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
-                  <NumberTicker value={4.9} decimalPlaces={1} className="text-white dark:text-white" />
-                  <span>★</span>
-                </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>User rating</div>
-              </div>
+              ))}
             </div>
           </div>
         </div>

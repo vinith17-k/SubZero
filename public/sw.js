@@ -1,4 +1,4 @@
-const CACHE = 'subzero-shell-v2';
+const CACHE = 'subzero-shell-v3';
 const SHELL_FILES = ['/', '/index.html'];
 
 self.addEventListener('install', event => {
