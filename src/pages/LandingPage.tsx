@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
+import { HeroPreviewCard } from '@/components/HeroPreviewCard';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -90,43 +91,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="sz-hero-preview sz-fade-in sz-fade-in-4">
-            <div className="sz-float-card sz-float-card-1">
-              <div className="sz-float-dot" />
-              ₹3,200 wasted this month
-            </div>
-            <div className="sz-preview-card">
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid #F0EFEC', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#8A8A82', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Monthly Overview</span>
-                <span style={{ fontSize: 12, color: '#8A8A82' }}>Nov 2026</span>
-              </div>
-              <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, fontWeight: 900, color: '#0A0A0A', padding: '20px 24px 8px' }}>₹8,490</div>
-              <div style={{ fontSize: 13, color: '#8A8A82', padding: '0 24px 16px' }}>Total subscription spend</div>
-              <div style={{ padding: '16px 24px', display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
-                {[35, 55, 42, 68, 52, 75, 60].map((h, i) => (
-                  <div key={i} style={{ flex: 1, height: h, background: i === 6 ? '#E8541A' : '#E2E1DC', borderRadius: '4px 4px 0 0' }} />
-                ))}
-              </div>
-              <div style={{ padding: '16px 24px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { icon: 'YT', bg: '#FF0000', name: 'YouTube Premium', freq: 'Monthly · Active', cost: '₹189', textColor: 'white', textSize: '11px' },
-                  { icon: '♪', bg: '#1DB954', name: 'Spotify', freq: 'Monthly · Low Usage', cost: '₹119', textColor: 'black', textSize: '16px' },
-                  { icon: 'N', bg: '#E50914', name: 'Netflix', freq: 'Monthly · Unused', cost: '₹649', textColor: 'white', textSize: '14px' },
-                ].map((s, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#F0EFEC', borderRadius: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: s.textSize, fontWeight: 700, color: s.textColor }}>{s.icon}</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
-                        <div style={{ fontSize: 11, color: '#8A8A82' }}>{s.freq}</div>
-                      </div>
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: i === 2 ? '#dc2626' : '#0A0A0A' }}>{s.cost}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="sz-float-card sz-float-card-2">Save ₹1,890/mo</div>
+          <div className="sz-fade-in sz-fade-in-4 w-full flex justify-center">
+            <HeroPreviewCard />
           </div>
         </div>
 
@@ -134,7 +100,7 @@ export default function LandingPage() {
         <div className="sz-mobile-hero-stat sz-fade-in sz-fade-in-4">
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {[
-              { label: 'Avg wasted/mo', val: '₹3,200' },
+              { label: 'Avg wasted/mo', val: '₹768' },
               { label: 'Avg subscriptions', val: '11' },
               { label: 'AI insights', val: 'Free' },
             ].map((s, i) => (

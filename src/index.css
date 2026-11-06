@@ -1134,6 +1134,25 @@ body::before {
   border-radius: 8px;
 }
 
+/* ── PILL SHIMMER ── */
+@keyframes sz-pill-shimmer {
+  0% { transform: translateX(-150%); }
+  50%, 100% { transform: translateX(150%); }
+}
+.sz-shimmer-pill {
+  position: relative;
+  overflow: hidden;
+}
+.sz-shimmer-pill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: translateX(-150%);
+  animation: sz-pill-shimmer 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
 /* ── MOBILE BODY PADDING (prevent content hiding behind sticky CTA) ── */
 @media (max-width: 900px) {
   .sz-final-cta-section { padding-bottom: 100px; }
