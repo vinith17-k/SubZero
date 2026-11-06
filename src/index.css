@@ -1187,4 +1187,12 @@ body::before {
   flex-wrap: wrap;
 }
 
+/* ── MAGIC UI VIEW TRANSITION STYLES ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+
 

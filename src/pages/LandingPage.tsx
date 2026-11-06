@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { NumberTicker } from '@/components/ui/number-ticker';
+import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
 
 const TESTIMONIALS = [
   {
@@ -77,7 +80,10 @@ export default function LandingPage() {
           <li><a href="#testimonials">Reviews</a></li>
           <li><a href="#pricing">Pricing</a></li>
         </ul>
-        <button className="sz-nav-cta" onClick={() => navigate('/auth')}>Get Started Free</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <AnimatedThemeToggler variant="circle" />
+          <button className="sz-nav-cta" onClick={() => navigate('/auth')}>Get Started Free</button>
+        </div>
       </nav>
 
       <div style={{ position: 'relative', zIndex: 1, paddingTop: 80 }}>
@@ -91,17 +97,35 @@ export default function LandingPage() {
             <p className="sz-hero-sub sz-fade-in sz-fade-in-3">
               Most people unknowingly waste thousands per year on forgotten, overlapping, or underused subscriptions. SubZero gives you total clarity.
             </p>
-            <div className="sz-hero-ctas sz-fade-in sz-fade-in-4">
-              <button className="sz-btn-primary" onClick={() => navigate('/auth')}>Start for Free →</button>
+            <div className="sz-hero-ctas sz-fade-in sz-fade-in-4" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <InteractiveHoverButton onClick={() => navigate('/auth')}>
+                Start for Free
+              </InteractiveHoverButton>
               <button className="sz-btn-secondary" onClick={() => navigate('/auth')}>See Demo ↗</button>
             </div>
-            <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {[{ val: '12k+', label: 'Active users' }, { val: '₹2.4Cr', label: 'Saved' }, { val: '4.9★', label: 'Rating' }].map((s, i) => (
-                <div key={i}>
-                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, color: '#0A0A0A' }}>{s.val}</div>
-                  <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>{s.label}</div>
+            <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 32, display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
+                  <NumberTicker value={12} />
+                  <span>k+</span>
                 </div>
-              ))}
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Active users</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
+                  <span>₹</span>
+                  <NumberTicker value={2.4} decimalPlaces={1} />
+                  <span>Cr</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Saved</div>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 900, color: '#0A0A0A', display: 'flex', alignItems: 'baseline' }}>
+                  <NumberTicker value={4.9} decimalPlaces={1} />
+                  <span>★</span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>Rating</div>
+              </div>
             </div>
           </div>
 
@@ -405,21 +429,40 @@ export default function LandingPage() {
           <div className="sz-final-cta-card">
             <h2 className="sz-final-cta-title">Start <em>Saving</em><br />Money Now</h2>
             <p className="sz-final-cta-sub">Join thousands of users who've already taken control of their subscriptions. Setup takes under 3 minutes.</p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-              <button onClick={() => navigate('/auth')} style={{ background: 'white', color: 'black', border: 'none', padding: '16px 40px', borderRadius: 100, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", transition: 'all 0.25s' }}>
-                Get Started Free →
-              </button>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1, alignItems: 'center' }}>
+              <InteractiveHoverButton
+                onClick={() => navigate('/auth')}
+                className="bg-white text-black border-transparent hover:border-white/50 text-base py-3 px-8"
+              >
+                Get Started Free
+              </InteractiveHoverButton>
               <button style={{ background: 'transparent', color: 'white', border: '1.5px solid rgba(255,255,255,0.2)', padding: '16px 28px', borderRadius: 100, fontSize: 15, fontWeight: 500, cursor: 'default', fontFamily: "'DM Sans', sans-serif" }}>
                 No credit card needed
               </button>
             </div>
-            <div style={{ marginTop: 48, display: 'flex', gap: 40, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
-              {[{ val: '12k+', label: 'Active users' }, { val: '₹2.4Cr', label: 'Saved this year' }, { val: '4.9★', label: 'User rating' }].map((s, i) => (
-                <div key={i} style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white' }}>{s.val}</div>
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{s.label}</div>
+            <div style={{ marginTop: 48, display: 'flex', gap: 48, justifyContent: 'center', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+                  <NumberTicker value={12} className="text-white dark:text-white" />
+                  <span>k+</span>
                 </div>
-              ))}
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Active users</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+                  <span>₹</span>
+                  <NumberTicker value={2.4} decimalPlaces={1} className="text-white dark:text-white" />
+                  <span>Cr</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Saved this year</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 32, fontWeight: 900, color: 'white', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+                  <NumberTicker value={4.9} decimalPlaces={1} className="text-white dark:text-white" />
+                  <span>★</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>User rating</div>
+              </div>
             </div>
           </div>
         </div>

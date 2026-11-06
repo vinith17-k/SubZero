@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { fmtCurrency, daysUntil, renewalUrgencyColor } from '@/lib/format';
 import { isTrial, trialDaysLeft } from '@/lib/subscriptionMeta';
+import { NumberTicker } from '@/components/ui/number-ticker';
+import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
 
 const CATEGORY_COLORS: Record<string, string> = {
   Entertainment: '#E8541A', Productivity: '#0078D4', Music: '#1DB954',
@@ -152,22 +154,29 @@ export default function Dashboard() {
         <div className="sz-stats-grid">
           <div className="sz-stat-card sz-fade-in sz-fade-in-1">
             <div className="sz-stat-label">Monthly Spend</div>
-            <div className="sz-stat-value">{fmtCurrency(totalMonthly)}</div>
+            <div className="sz-stat-value" style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span>₹</span>
+              <NumberTicker value={Math.round(totalMonthly)} />
+            </div>
             <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>
               {activeSubs.length} active subscription{activeSubs.length !== 1 ? 's' : ''}
             </div>
           </div>
           <div className="sz-stat-card sz-fade-in sz-fade-in-2">
             <div className="sz-stat-label">Yearly Projection</div>
-            <div className="sz-stat-value">{fmtCurrency(totalMonthly * 12)}</div>
+            <div className="sz-stat-value" style={{ display: 'flex', alignItems: 'baseline' }}>
+              <span>₹</span>
+              <NumberTicker value={Math.round(totalMonthly * 12)} />
+            </div>
             <div className="sz-stat-change" style={{ color: 'var(--sz-gray-500)' }}>
               {fmtCurrency(totalMonthly * 12 / 12)}/mo average
             </div>
           </div>
           <div className="sz-stat-card sz-glass-card sz-fade-in sz-fade-in-3" style={{ borderLeft: '4px solid #0284C7' }}>
             <div className="sz-stat-label" style={{ color: '#0369A1', fontWeight: 700 }}>Savings Potential ✦</div>
-            <div className="sz-stat-value" style={{ color: 'var(--sz-accent)', fontSize: 44, marginTop: 4 }}>
-              {fmtCurrency(totalSavings / 12)}
+            <div className="sz-stat-value" style={{ color: 'var(--sz-accent)', fontSize: 44, marginTop: 4, display: 'flex', alignItems: 'baseline' }}>
+              <span>₹</span>
+              <NumberTicker value={Math.round(totalSavings / 12)} />
             </div>
             <div className="sz-stat-change" style={{ color: '#0284C7', fontWeight: 600, marginTop: 10 }}>
               {insights.length} AI insight{insights.length !== 1 ? 's' : ''} action waiting
@@ -361,9 +370,12 @@ export default function Dashboard() {
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Save up to {fmtCurrency(totalSavings / 12)}/mo by acting on them</div>
               </div>
             </div>
-            <button className="sz-btn-primary" style={{ background: 'var(--sz-accent)', fontSize: 13, padding: '10px 20px', flexShrink: 0 }} onClick={() => navigate('/insights')}>
-              View Insights →
-            </button>
+            <InteractiveHoverButton
+              onClick={() => navigate('/insights')}
+              className="bg-white text-black border-transparent hover:border-white/40 text-sm py-2 px-5 flex-shrink-0"
+            >
+              View Insights
+            </InteractiveHoverButton>
           </div>
         )}
       </div>

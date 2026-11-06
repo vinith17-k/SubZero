@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 
 interface NavItem {
   label: string;
@@ -91,27 +92,30 @@ export default function Sidebar({ insightCount = 0 }: SidebarProps) {
           )}
         </div>
 
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          style={{
-            background: 'rgba(0,0,0,0.04)',
-            border: 'none',
-            borderRadius: 8,
-            width: 28,
-            height: 28,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            color: 'var(--sz-gray-700)',
-            transition: 'all 0.2s',
-          }}
-        >
-          <svg viewBox="0 0 16 16" fill="currentColor" style={{ width: 14, height: 14, transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
-            <path d="M10.22 3.22a.75.75 0 0 1 1.06 1.06L7.56 8l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25Z" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <AnimatedThemeToggler variant="circle" />
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            style={{
+              background: 'rgba(0,0,0,0.04)',
+              border: 'none',
+              borderRadius: 8,
+              width: 28,
+              height: 28,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--sz-gray-700)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" style={{ width: 14, height: 14, transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.3s' }}>
+              <path d="M10.22 3.22a.75.75 0 0 1 1.06 1.06L7.56 8l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25Z" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Nav Sections */}
