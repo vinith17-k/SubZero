@@ -79,7 +79,7 @@ export default function Dashboard() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
           <div>
-            <div className="sz-page-heading sz-fade-in sz-fade-in-1">{greeting}, {firstName} ✦</div>
+            <div className="sz-page-heading sz-fade-in sz-fade-in-1">{greeting}, {firstName}</div>
             <div className="sz-page-sub sz-fade-in sz-fade-in-2">Here's your subscription overview for {monthYear}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -90,12 +90,12 @@ export default function Dashboard() {
             )}
             {frozenSubs.length > 0 && (
               <div style={{ fontSize: 13, color: '#1d4ed8', background: '#DBEAFE', padding: '6px 14px', borderRadius: 100, fontWeight: 600 }}>
-                ❄️ {frozenSubs.length} frozen
+                {frozenSubs.length} frozen
               </div>
             )}
             {urgentTrials.length > 0 && (
               <div style={{ fontSize: 13, color: '#b45309', background: '#FEF9C3', padding: '6px 14px', borderRadius: 100, fontWeight: 600 }}>
-                ⏳ {urgentTrials.length} trial ending
+                {urgentTrials.length} trial ending soon
               </div>
             )}
             <div className="sz-avatar sz-fade-in sz-fade-in-1" onClick={() => navigate('/settings')}>
@@ -106,15 +106,14 @@ export default function Dashboard() {
 
         {/* Trial urgency banner */}
         {urgentTrials.length > 0 && (
-          <div style={{ background: 'linear-gradient(90deg, #FFF7ED, #FFFBEB)', border: '1.5px solid #F59E0B', borderRadius: 16, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} className="sz-fade-in sz-fade-in-1">
-            <span style={{ fontSize: 20 }}>⏳</span>
+          <div style={{ background: '#FFF7ED', border: '1.5px solid #F59E0B', borderRadius: 12, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }} className="sz-fade-in sz-fade-in-1">
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Trial ending soon!</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#92400E' }}>Trial ending soon</div>
               <div style={{ fontSize: 12, color: '#92400E', marginTop: 2 }}>
                 {urgentTrials.map(s => s.name).join(', ')} will start charging within 3 days. Check AI Insights.
               </div>
             </div>
-            <button className="sz-btn-primary" style={{ fontSize: 13, padding: '8px 16px', background: '#92400E' }} onClick={() => navigate('/insights')}>View Alerts →</button>
+            <button className="sz-btn-primary" style={{ fontSize: 13, padding: '8px 16px', background: '#92400E' }} onClick={() => navigate('/insights')}>View Alerts</button>
           </div>
         )}
 
@@ -132,7 +131,7 @@ export default function Dashboard() {
             <div className="sz-temp-gauge-card sz-fade-in sz-fade-in-1" style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>{wastePct < 30 ? '❄️' : wastePct < 60 ? '🌡️' : '🔥'}</span>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: wastePct < 30 ? '#0284C7' : wastePct < 60 ? '#D97706' : '#DC2626', flexShrink: 0 }} />
                   <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sz-black)' }}>Spend Temperature Gauge</span>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: badgeColor, background: badgeBg, padding: '4px 10px', borderRadius: 100, letterSpacing: '0.04em' }}>
@@ -143,8 +142,8 @@ export default function Dashboard() {
                 <div className="sz-temp-gauge-indicator" style={{ left: `${Math.max(4, Math.min(96, wastePct))}%` }} title={`${wastePct}% of monthly spend is idle/unused`} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--sz-gray-500)', marginTop: 8, fontWeight: 600 }}>
-                <span>❄️ Icy Cool (0% Waste)</span>
-                <span>🔥 Hot Waste ({fmtCurrency(wasteSpend)}/mo idle)</span>
+                <span>Cool (0% Waste)</span>
+                <span>Hot Waste ({fmtCurrency(wasteSpend)}/mo idle)</span>
               </div>
             </div>
           );
@@ -172,8 +171,8 @@ export default function Dashboard() {
               {fmtCurrency(totalMonthly * 12 / 12)}/mo average
             </div>
           </div>
-          <div className="sz-stat-card sz-glass-card sz-fade-in sz-fade-in-3" style={{ borderLeft: '4px solid #0284C7' }}>
-            <div className="sz-stat-label" style={{ color: '#0369A1', fontWeight: 700 }}>Savings Potential ✦</div>
+          <div className="sz-stat-card sz-glass-card sz-fade-in sz-fade-in-3">
+            <div className="sz-stat-label" style={{ color: '#0369A1', fontWeight: 700 }}>Savings Potential</div>
             <div className="sz-stat-value" style={{ color: 'var(--sz-accent)', fontSize: 44, marginTop: 4, display: 'flex', alignItems: 'baseline' }}>
               <span>₹</span>
               <NumberTicker value={Math.round(totalSavings / 12)} />
@@ -236,7 +235,9 @@ export default function Dashboard() {
             <div style={{ marginTop: 12 }}>
               {upcoming.length === 0 ? (
                 <div style={{ padding: '28px 24px', textAlign: 'center', color: 'var(--sz-gray-500)', fontSize: 14 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
+                  <div style={{ fontSize: 24, marginBottom: 8, color: 'var(--sz-gray-400)' }}>
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  </div>
                   <div>No renewals in the next 30 days</div>
                 </div>
               ) : upcoming.map(r => {
@@ -278,7 +279,9 @@ export default function Dashboard() {
         <div className="sz-card sz-fade-in sz-fade-in-4" style={{ marginBottom: 28 }}>
           {subscriptions.length === 0 ? (
             <div style={{ padding: '60px 24px', textAlign: 'center' }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>📭</div>
+              <div style={{ marginBottom: 16, color: 'var(--sz-gray-300)' }}>
+                <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+              </div>
               <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 900, marginBottom: 8 }}>No subscriptions yet</div>
               <div style={{ fontSize: 14, color: 'var(--sz-gray-500)', marginBottom: 24 }}>Add your first subscription to unlock AI insights, renewal alerts, and spending analytics.</div>
               <button className="sz-btn-primary" style={{ fontSize: 14, padding: '12px 28px' }} onClick={() => navigate('/subscriptions')}>
@@ -364,7 +367,9 @@ export default function Dashboard() {
         {insights.length > 0 && (
           <div className="sz-fade-in sz-fade-in-5" style={{ marginTop: 24, background: 'var(--sz-black)', borderRadius: 20, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 28 }}>🤖</div>
+              <div style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.1)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+              </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>You have {insights.length} AI insight{insights.length !== 1 ? 's' : ''}</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>Save up to {fmtCurrency(totalSavings / 12)}/mo by acting on them</div>

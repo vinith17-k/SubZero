@@ -33,30 +33,30 @@ export default function AuthPage() {
       navigate('/dashboard');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Authentication failed.';
-      toast.error(message);
+      // Network/Supabase down — suggest demo mode
+      if (message.toLowerCase().includes('fetch') || message.toLowerCase().includes('network') || message.toLowerCase().includes('failed')) {
+        toast.error('Could not reach server. Try Demo Mode to explore the app offline.', { duration: 6000 });
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDemoMode = () => {
+    enterDemoMode();
+    navigate('/dashboard');
+  };
+
   return (
     <div className="sz-auth-page">
-      {/* Background decoration */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-        <svg viewBox="0 0 1440 900" style={{ width: '100%', height: '100%' }} fill="none">
-          <path d="M-100 600 Q 300 400 700 500 Q 1100 600 1500 300" stroke="#0A0A0A" strokeWidth="0.5" opacity="0.07" />
-          <circle cx="1200" cy="150" r="300" stroke="#0A0A0A" strokeWidth="0.5" opacity="0.04" />
-          <circle cx="200" cy="700" r="200" stroke="#E8541A" strokeWidth="0.5" opacity="0.05" />
-        </svg>
-      </div>
-
       <div className="sz-auth-card" style={{ position: 'relative', zIndex: 1 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             width: 56, height: 56, background: '#0A0A0A', borderRadius: 16,
             display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
           }}>
             <svg viewBox="0 0 16 16" style={{ width: 24, height: 24, fill: 'white' }}>
               <path d="M8 2L14 5.5V10.5L8 14L2 10.5V5.5L8 2Z" />
@@ -133,11 +133,12 @@ export default function AuthPage() {
                 style={{
                   position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
                   background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sz-gray-500)',
-                  fontSize: 18, lineHeight: 1, padding: 4
+                  fontSize: 13, fontWeight: 600, letterSpacing: '0.02em', padding: 4,
+                  fontFamily: "'DM Sans', sans-serif",
                 }}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </div>
@@ -160,23 +161,9 @@ export default function AuthPage() {
                 animation: 'sz-spin 0.7s linear infinite', display: 'inline-block', flexShrink: 0
               }} />
             )}
-            {loading ? (tab === 'signup' ? 'Creating account…' : 'Signing in…') : tab === 'signup' ? 'Create Account →' : 'Sign In →'}
+            {loading ? (tab === 'signup' ? 'Creating account...' : 'Signing in...') : tab === 'signup' ? 'Create Account' : 'Sign In'}
           </button>
         </form>
-
-        <div className="sz-auth-offline">
-          <button
-            type="button"
-            className="sz-auth-demo-button"
-            onClick={() => {
-              enterDemoMode();
-              navigate('/dashboard');
-            }}
-          >
-            Continue offline
-          </button>
-          <p>Works without an account and saves changes in this browser.</p>
-        </div>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: '#8A8A82' }}>
           {tab === 'login'
@@ -185,14 +172,27 @@ export default function AuthPage() {
           }
         </div>
 
-        <div style={{ marginTop: 28, padding: '16px 0 0', borderTop: '1px solid var(--sz-gray-200)', textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--sz-gray-300)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>Trusted by</div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 20, opacity: 0.5, fontSize: 13, fontWeight: 600, color: 'var(--sz-gray-700)' }}>
-            <span>12k+ Users</span>
-            <span>·</span>
-            <span>₹2.4Cr Saved</span>
-            <span>·</span>
-            <span>4.9★ Rating</span>
+        {/* Demo Mode Divider */}
+        <div style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid var(--sz-gray-200)', textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--sz-gray-400)', marginBottom: 12 }}>
+            No account needed
+          </div>
+          <button
+            onClick={handleDemoMode}
+            style={{
+              width: '100%', background: 'var(--sz-gray-100)', color: '#0A0A0A',
+              border: '1.5px solid var(--sz-gray-200)', padding: '13px',
+              borderRadius: 14, fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => { (e.currentTarget).style.background = 'var(--sz-gray-200)'; }}
+            onMouseLeave={e => { (e.currentTarget).style.background = 'var(--sz-gray-100)'; }}
+          >
+            Try Demo Mode
+          </button>
+          <div style={{ fontSize: 11, color: 'var(--sz-gray-400)', marginTop: 8 }}>
+            Explore the app with sample data. No sign-up required.
           </div>
         </div>
       </div>

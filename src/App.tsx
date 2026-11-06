@@ -12,6 +12,8 @@ import SubscriptionsPage from "./pages/SubscriptionsPage";
 import InsightsPage from "./pages/InsightsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SettingsPage from "./pages/SettingsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TOSPage from "./pages/TOSPage";
 import { Analytics } from "@vercel/analytics/react";
 import NotFound from "./pages/NotFound";
 
@@ -56,6 +58,8 @@ const App = () => (
               element={<AuthGuard><SettingsPage /></AuthGuard>}
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/tos" element={<TOSPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
