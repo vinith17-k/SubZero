@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export default function AuthPage() {
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, enterDemoMode } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -25,7 +25,7 @@ export default function AuthPage() {
     try {
       if (tab === 'signup') {
         await signUp(email, password, fullName);
-        toast.success('Account created! Welcome to SubZero 🧊');
+        toast.success('Account created! Welcome to SubZero.');
       } else {
         await signIn(email, password);
         toast.success('Welcome back!');
@@ -163,6 +163,20 @@ export default function AuthPage() {
             {loading ? (tab === 'signup' ? 'Creating account…' : 'Signing in…') : tab === 'signup' ? 'Create Account →' : 'Sign In →'}
           </button>
         </form>
+
+        <div className="sz-auth-offline">
+          <button
+            type="button"
+            className="sz-auth-demo-button"
+            onClick={() => {
+              enterDemoMode();
+              navigate('/dashboard');
+            }}
+          >
+            Continue offline
+          </button>
+          <p>Works without an account and saves changes in this browser.</p>
+        </div>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: '#8A8A82' }}>
           {tab === 'login'

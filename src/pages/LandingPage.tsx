@@ -1,37 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
 import { NumberTicker } from '@/components/ui/number-ticker';
 import { InteractiveHoverButton } from '@/components/ui/interactive-hover-button';
 
-const TESTIMONIALS = [
-  {
-    name: 'Arjun Sharma',
-    role: 'Software Engineer, Bengaluru',
-    avatar: 'AS',
-    quote: "Found ₹2,400/mo in forgotten subscriptions within my first week. The AI caught Netflix, Hotstar AND an old Adobe plan I completely forgot about.",
-    saved: '₹2,400/mo',
-  },
-  {
-    name: 'Priya Mehta',
-    role: 'Product Manager, Mumbai',
-    avatar: 'PM',
-    quote: "The renewal calendar alone is worth it. I used to get surprised by annual charges constantly. Not anymore — SubZero warns me 7 days in advance.",
-    saved: '₹1,800/mo',
-  },
-  {
-    name: 'Rahul Nair',
-    role: 'Freelance Designer, Delhi',
-    avatar: 'RN',
-    quote: "Clean, fast, and actually useful. Spotted that I had both Figma and Adobe CC overlapping — dropped Adobe and saved ₹1,675/mo instantly.",
-    saved: '₹1,675/mo',
-  },
-];
-
 export default function LandingPage() {
   const navigate = useNavigate();
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
@@ -44,12 +19,6 @@ export default function LandingPage() {
     );
     document.querySelectorAll('.sz-reveal').forEach(el => observerRef.current?.observe(el));
     return () => observerRef.current?.disconnect();
-  }, []);
-
-  // Auto-cycle testimonials
-  useEffect(() => {
-    const t = setInterval(() => setActiveTestimonial(a => (a + 1) % TESTIMONIALS.length), 4000);
-    return () => clearInterval(t);
   }, []);
 
   return (
@@ -77,7 +46,6 @@ export default function LandingPage() {
         <ul className="sz-nav-links">
           <li><a href="#features">Features</a></li>
           <li><a href="#how-it-works">How it works</a></li>
-          <li><a href="#testimonials">Reviews</a></li>
           <li><a href="#pricing">Pricing</a></li>
         </ul>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -331,58 +299,6 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-
-        {/* TESTIMONIALS */}
-        <div className="sz-section sz-reveal" id="testimonials">
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
-            <span className="sz-section-label">What Users Say</span>
-            <h2 className="sz-section-title">Real people, real savings</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }} className="sz-testimonials-grid">
-            {TESTIMONIALS.map((t, i) => (
-              <div
-                key={i}
-                className="sz-card"
-                style={{
-                  padding: 28,
-                  transition: 'all 0.4s cubic-bezier(0.23, 1, 0.32, 1)',
-                  transform: i === activeTestimonial ? 'translateY(-8px)' : 'none',
-                  boxShadow: i === activeTestimonial ? 'var(--sz-card-shadow-hover)' : 'var(--sz-card-shadow)',
-                  borderTop: i === activeTestimonial ? '3px solid var(--sz-accent)' : '3px solid transparent',
-                }}
-              >
-                <div style={{ fontSize: 32, marginBottom: 16, color: 'var(--sz-accent)', fontFamily: 'serif', lineHeight: 1 }}>"</div>
-                <p style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--sz-gray-700)', marginBottom: 20 }}>{t.quote}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 16, borderTop: '1px solid var(--sz-gray-100)' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#0A0A0A', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>
-                    {t.avatar}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{t.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--sz-gray-500)' }}>{t.role}</div>
-                  </div>
-                  <div style={{ background: 'var(--sz-accent-light)', color: 'var(--sz-accent)', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100 }}>
-                    Saved {t.saved}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Dots indicator */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
-            {TESTIMONIALS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveTestimonial(i)}
-                style={{
-                  width: i === activeTestimonial ? 24 : 8, height: 8, borderRadius: 100,
-                  background: i === activeTestimonial ? 'var(--sz-accent)' : 'var(--sz-gray-300)',
-                  border: 'none', cursor: 'pointer', transition: 'all 0.3s', padding: 0
-                }}
-              />
-            ))}
           </div>
         </div>
 

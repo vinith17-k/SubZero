@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { DEMO_USER_ID, MOCK_SUBSCRIPTIONS } from '@/lib/mockData';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import {
   parseMeta, stringifyMeta, isFrozen, isTrial, userShareFraction,
@@ -11,13 +12,30 @@ export type Subscription = Tables<'subscriptions'>;
 export type SubscriptionInsert = TablesInsert<'subscriptions'>;
 export type SubscriptionUpdate = TablesUpdate<'subscriptions'>;
 
+const LOCAL_KEY = 'sz_offline_subscriptions';
+
+function readLocalSubscriptions(): Subscription[] {
+  const saved = localStorage.getItem(LOCAL_KEY);
+  if (!saved) return MOCK_SUBSCRIPTIONS;
+  try {
+    return JSON.parse(saved) as Subscription[];
+  } catch {
+    return MOCK_SUBSCRIPTIONS;
+  }
+}
+
+function writeLocalSubscriptions(subscriptions: Subscription[]) {
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(subscriptions));
+}
+
 export function useSubscriptions() {
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
   const qc = useQueryClient();
 
   const query = useQuery({
     queryKey: ['subscriptions', user?.id],
     queryFn: async () => {
+      if (isDemoMode) return readLocalSubscriptions();
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
@@ -32,6 +50,17 @@ export function useSubscriptions() {
 
   const addSubscription = useMutation({
     mutationFn: async (sub: Omit<SubscriptionInsert, 'user_id'>) => {
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions();
+        writeLocalSubscriptions([...subscriptions, {
+          ...sub,
+          id: crypto.randomUUID(),
+          user_id: DEMO_USER_ID,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as Subscription]);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .insert({ ...sub, user_id: user!.id });
@@ -42,6 +71,13 @@ export function useSubscriptions() {
 
   const updateSubscription = useMutation({
     mutationFn: async ({ id, ...updates }: SubscriptionUpdate & { id: string }) => {
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions().map(subscription =>
+          subscription.id === id ? { ...subscription, ...updates, updated_at: new Date().toISOString() } : subscription
+        );
+        writeLocalSubscriptions(subscriptions);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .update(updates)
@@ -57,6 +93,13 @@ export function useSubscriptions() {
       id: string; oldCost: number; newCost: number; currentNotes: string | null;
     }) => {
       const meta = recordPriceChange(currentNotes, oldCost, newCost);
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions().map(subscription =>
+          subscription.id === id ? { ...subscription, cost: newCost, notes: stringifyMeta(meta), updated_at: new Date().toISOString() } : subscription
+        );
+        writeLocalSubscriptions(subscriptions);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .update({ cost: newCost, notes: stringifyMeta(meta) })
@@ -68,6 +111,13 @@ export function useSubscriptions() {
 
   const deleteSubscription = useMutation({
     mutationFn: async (id: string) => {
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions().map(subscription =>
+          subscription.id === id ? { ...subscription, is_active: false, updated_at: new Date().toISOString() } : subscription
+        );
+        writeLocalSubscriptions(subscriptions);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .update({ is_active: false })
@@ -81,6 +131,13 @@ export function useSubscriptions() {
   const freezeSubscription = useMutation({
     mutationFn: async ({ id, currentNotes }: { id: string; currentNotes: string | null }) => {
       const meta = { ...parseMeta(currentNotes), is_frozen: true, frozen_at: new Date().toISOString() };
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions().map(subscription =>
+          subscription.id === id ? { ...subscription, notes: stringifyMeta(meta) } : subscription
+        );
+        writeLocalSubscriptions(subscriptions);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .update({ notes: stringifyMeta(meta) })
@@ -94,6 +151,13 @@ export function useSubscriptions() {
   const unfreezeSubscription = useMutation({
     mutationFn: async ({ id, currentNotes }: { id: string; currentNotes: string | null }) => {
       const meta = { ...parseMeta(currentNotes), is_frozen: false, frozen_at: undefined };
+      if (isDemoMode) {
+        const subscriptions = readLocalSubscriptions().map(subscription =>
+          subscription.id === id ? { ...subscription, notes: stringifyMeta(meta) } : subscription
+        );
+        writeLocalSubscriptions(subscriptions);
+        return;
+      }
       const { error } = await supabase
         .from('subscriptions')
         .update({ notes: stringifyMeta(meta) })

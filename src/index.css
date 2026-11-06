@@ -1196,3 +1196,27 @@ body::before {
 
 
 
+/* Offline authentication fallback */
+.sz-auth-offline {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--sz-gray-100);
+  text-align: center;
+}
+
+.sz-auth-demo-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--sz-black);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sz-black);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sz-auth-offline p {
+  margin: 10px 0 0;
+  color: var(--sz-gray-500);
+  font-size: 12px;
+}

@@ -4,6 +4,7 @@ import { useAuth } from './useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import type { Subscription } from './useSubscriptions';
 import { parseMeta, isFrozen, trialDaysLeft, recentPriceChange } from '@/lib/subscriptionMeta';
+import { MOCK_INSIGHTS } from '@/lib/mockData';
 
 export type AiInsight = Tables<'ai_insights'>;
 
@@ -165,12 +166,21 @@ function generatePriceHikeInsights(subscriptions: Subscription[]): RichInsight[]
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useInsights(subscriptions?: Subscription[]) {
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
   const qc = useQueryClient();
 
   const query = useQuery({
     queryKey: ['insights', user?.id],
     queryFn: async () => {
+      if (isDemoMode) {
+        const generated: RichInsight[] = generateServerInsights(subscriptions ?? [], user!.id).map((item, index) => ({
+          ...item,
+          id: `local-${index}`,
+          is_dismissed: false,
+          created_at: new Date().toISOString(),
+        })) as RichInsight[];
+        return [...generated, ...MOCK_INSIGHTS.filter(insight => !insight.is_dismissed)] as unknown as RichInsight[];
+      }
       const { data, error } = await supabase
         .from('ai_insights')
         .select('*')

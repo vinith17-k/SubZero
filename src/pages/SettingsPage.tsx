@@ -68,7 +68,7 @@ function DeleteAccountModal({ onConfirm, onCancel, loading }: DangerModalProps) 
 }
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, isDemoMode, signOut } = useAuth();
   const { data: subscriptions = [] } = useSubscriptions();
   const { data: insights = [] } = useInsights(subscriptions);
   const { data: settings, updateSettings } = useUserSettings();
@@ -157,6 +157,13 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     setDeletingAccount(true);
     try {
+      if (isDemoMode) {
+        localStorage.removeItem('sz_offline_subscriptions');
+        localStorage.removeItem('sz_offline_settings');
+        await signOut();
+        window.location.href = '/';
+        return;
+      }
       // Delete user data from Supabase tables
       await supabase.from('subscriptions').delete().eq('user_id', user!.id);
       await supabase.from('ai_insights').delete().eq('user_id', user!.id);

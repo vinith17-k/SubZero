@@ -1,11 +1,16 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { isSupabaseConfigured, supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import { DEMO_USER, DEMO_USER_ID } from '@/lib/mockData';
+
+const DEMO_KEY = 'sz_demo_mode';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isDemoMode: boolean;
+  enterDemoMode: () => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -17,29 +22,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Check demo mode first (synchronous, instant)
+    const demo = localStorage.getItem(DEMO_KEY) === 'true';
+    if (demo) {
+      setIsDemoMode(true);
+      setUser(DEMO_USER as unknown as User);
       setLoading(false);
-    });
+      return;
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    if (!isSupabaseConfigured) {
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => subscription.unsubscribe();
+    // Real Supabase auth — wrap in try/catch so a dead instance doesn't crash
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+      } catch {
+        // Supabase unreachable — just leave user null, auth page will offer demo
+      } finally {
+        setLoading(false);
+      }
+    };
+    initAuth();
+
+    let unsubscribe: (() => void) | undefined;
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    } catch {
+      // ignore if Supabase is dead
+    }
+
+    return () => unsubscribe?.();
   }, []);
 
+  const enterDemoMode = () => {
+    localStorage.setItem(DEMO_KEY, 'true');
+    setIsDemoMode(true);
+    setUser(DEMO_USER as unknown as User);
+    setSession(null);
+  };
+
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) throw new Error('Online sign-in is unavailable. Use Continue offline.');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    if (!isSupabaseConfigured) throw new Error('Online sign-up is unavailable. Use Continue offline.');
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -49,12 +92,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (isDemoMode) {
+      localStorage.removeItem(DEMO_KEY);
+      setIsDemoMode(false);
+      setUser(null);
+      setSession(null);
+      return;
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
 
+  // Expose a stable demo user id so hooks can key on it
+  const effectiveUser = isDemoMode
+    ? ({ ...DEMO_USER, id: DEMO_USER_ID } as unknown as User)
+    : user;
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user: effectiveUser, session, loading, isDemoMode, enterDemoMode, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
